@@ -173,7 +173,7 @@ export function RepairsPanel({ pin }: { pin: string | null }) {
                     void repo.dispatch({ type: 'markRepaired', incidentId: i.id }, { pin: pin ?? undefined })
                   }
                 >
-                  Repaired ✓
+                  Repaired
                 </button>
                 <button
                   className="btn btn-ghost btn-small"

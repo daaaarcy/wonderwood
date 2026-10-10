@@ -23,7 +23,7 @@ interface Props {
 
 /** A little flat picture token — kit boxes, stars, fruit etc. No emoji. */
 function Token({ t }: { t: string }) {
-  if (t === '❌') {
+  if (t === 'away') {
     // "taken away" — a faded gray box, not a scary red X
     return (
       <span className="token token-away" aria-hidden="true">
@@ -35,7 +35,7 @@ function Token({ t }: { t: string }) {
       </span>
     )
   }
-  if (t === '➕') {
+  if (t === 'add') {
     return (
       <span className="token token-add" aria-hidden="true">
         <svg viewBox="0 0 40 40">
@@ -45,8 +45,8 @@ function Token({ t }: { t: string }) {
       </span>
     )
   }
-  if (t === '⭐') return <img className="token" src={assetUrl('star')} alt="" />
-  if (t === '🍎') {
+  if (t === 'star') return <img className="token" src={assetUrl('star')} alt="" />
+  if (t === 'apple') {
     return (
       <span className="token" aria-hidden="true">
         <svg viewBox="0 0 40 40">
@@ -57,7 +57,7 @@ function Token({ t }: { t: string }) {
       </span>
     )
   }
-  if (t === '🪨') {
+  if (t === 'rock') {
     return (
       <span className="token" aria-hidden="true">
         <svg viewBox="0 0 40 40">
@@ -67,7 +67,7 @@ function Token({ t }: { t: string }) {
       </span>
     )
   }
-  if (t === '🪵') {
+  if (t === 'log') {
     return (
       <span className="token" aria-hidden="true">
         <svg viewBox="0 0 40 40">
@@ -77,7 +77,7 @@ function Token({ t }: { t: string }) {
       </span>
     )
   }
-  // 🧱 / 📦 — kit boxes
+  // brick / box — kit boxes
   return <img className="token" src={assetUrl('kit-box')} alt="" />
 }
 
@@ -213,7 +213,7 @@ export function ChallengeModal({ childId, questId, level, runIndex, today, repla
                 ))}
             </div>
             {feedback === 'try' && <p className="challenge-try" role="alert">Try again!</p>}
-            {feedback === 'right' && <p className="challenge-right">Yes! 🎉</p>}
+            {feedback === 'right' && <p className="challenge-right">Yes!</p>}
             <div className="challenge-tools">
               <button className="btn btn-neutral btn-small" onClick={showHint}>
                 Hint

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90">
+  <ellipse cx="60" cy="86" rx="34" ry="4" fill="#3c3c3c" opacity="0.08"/>
+  <!-- tail -->
+  <path d="M98 62 q20 -8 14 -30 q-14 8 -22 20 z" fill="#e08600"/>
+  <circle cx="108" cy="34" r="7" fill="#fff3e4"/>
+  <!-- body -->
+  <ellipse cx="56" cy="58" rx="34" ry="22" fill="#ef8f1a"/>
+  <ellipse cx="42" cy="66" rx="16" ry="12" fill="#fff3e4"/>
+  <!-- legs -->
+  <rect x="34" y="70" width="9" height="14" rx="4.5" fill="#b96f14"/>
+  <rect x="50" y="72" width="9" height="13" rx="4.5" fill="#b96f14"/>
+  <rect x="66" y="70" width="9" height="14" rx="4.5" fill="#b96f14"/>
+  <rect x="80" y="68" width="9" height="15" rx="4.5" fill="#b96f14"/>
+  <!-- head -->
+  <circle cx="30" cy="36" r="20" fill="#ef8f1a"/>
+  <path d="M14 30 L12 8 L28 20 Z" fill="#ef8f1a"/>
+  <path d="M40 22 L52 8 L50 30 Z" fill="#ef8f1a"/>
+  <path d="M16 34 q-4 12 8 18 q10 4 16 -4 z" fill="#fff3e4"/>
+  <circle cx="24" cy="32" r="3" fill="#3c3c3c"/>
+  <ellipse cx="13" cy="42" rx="4" ry="3" fill="#3c3c3c"/>
+</svg>

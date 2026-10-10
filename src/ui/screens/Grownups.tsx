@@ -148,7 +148,7 @@ export function Grownups({ onExit }: { onExit: () => void }) {
                     {(() => {
                       const r = rewardForApproval(state, claim)
                       return r.coins > 0 || r.stars > 0
-                        ? `${r.coins > 0 ? `+${r.coins} coins` : ''}${r.stars > 0 ? ' +1★' : ''}`
+                        ? `${r.coins > 0 ? `+${r.coins} coins` : ''}${r.stars > 0 ? ' +1 star' : ''}`
                         : 'recorded (0 coins)'
                     })()}
                   </span>

@@ -25,6 +25,7 @@ import { PromotionOverlay } from '../components/PromotionOverlay'
 import { PlayView } from '../play/PlayView'
 import { PostcardAlbum } from '../components/Postcard'
 import { CustomizeSheet, NameCitySheet } from '../components/Personalize'
+import { HouseTagIcon, MedalIcon, WeeklyBadgeIcon } from '../components/FlatIcons'
 
 /** Per-device record of building openings already celebrated. */
 const OPENINGS_KEY = 'wonderwood:seen-openings'
@@ -180,8 +181,10 @@ export function ChildHome({ childId }: { childId: ChildId }) {
   useEffect(() => {
     const onTap = (e: { kind: string; projectId?: ProjectId; planks?: number }) => {
       // Phaser listens at window level — a tap on a sheet above the canvas still
-      // reaches the scene. Ignore scene taps while any sheet/overlay is open.
+      // reaches the scene. Ignore scene taps while ANY overlay is open
+      // (sheets, play views, celebrations, dialogs).
       if (sheetRef.current) return
+      if (document.querySelector('[role="dialog"], .play-view, .celebration')) return
       if (e.kind === 'plot' && e.projectId) setSheet({ kind: 'plot', projectId: e.projectId })
       if (e.kind === 'bridge' && e.planks) setSheet({ kind: 'bridge', planks: e.planks })
       if (e.kind === 'truck') EventBus.emit('town-ride', childId)
@@ -230,7 +233,8 @@ export function ChildHome({ childId }: { childId: ChildId }) {
         <div className="island-wrap">
           <PhaserGame scene="town" onSceneReady={setSceneReady} />
           <button className="town-name-tag" onClick={() => setSheet({ kind: 'name-city' })}>
-            {city.name ? `🏡 ${city.name}` : '🏡 Name our town'}
+            <HouseTagIcon size={18} />
+            {city.name ?? 'Name our town'}
           </button>
         </div>
 
@@ -330,14 +334,21 @@ export function ChildHome({ childId }: { childId: ChildId }) {
             <article className="quest-card weekly-card" data-testid="weekly-card">
               <div className="quest-text">
                 <p className="quest-label">This week: {weekly.title}</p>
-                <p className="quest-sub">
-                  {weekly.completedAt
-                    ? `Done! +20 coins — badge earned!`
-                    : `${'●'.repeat(weekly.done)}${'○'.repeat(weekly.days - weekly.done)} ${weekly.done} of ${weekly.days} days`}
+                <p className="quest-sub weekly-progress">
+                  {weekly.completedAt ? (
+                    'Done! +20 coins — badge earned!'
+                  ) : (
+                    <>
+                      {Array.from({ length: weekly.days }, (_, i) => (
+                        <span key={i} className={`pip ${i < weekly.done ? 'pip-on' : ''}`} aria-hidden="true" />
+                      ))}
+                      {` ${weekly.done} of ${weekly.days} days`}
+                    </>
+                  )}
                 </p>
               </div>
               <span className="weekly-badge" aria-hidden="true">
-                {badgeForWeek ? '🏅' : '✨'}
+                {badgeForWeek ? <MedalIcon size={30} /> : <WeeklyBadgeIcon size={30} />}
               </span>
             </article>
           )}
@@ -591,7 +602,7 @@ export function ChildHome({ childId }: { childId: ChildId }) {
 
       {sheet?.kind === 'album' && (
         <div className="sheet-backdrop" onClick={closeSheet}>
-          <div className="sheet" role="dialog" aria-label="Postcard album" onClick={(e) => e.stopPropagation()}>
+          <div className="sheet album-sheet" role="dialog" aria-label="Postcard album" onClick={(e) => e.stopPropagation()}>
             <p className="sheet-title">Our postcards</p>
             <PostcardAlbum state={state} />
             <button className="btn btn-neutral" onClick={closeSheet}>
@@ -657,7 +668,9 @@ export function ChildHome({ childId }: { childId: ChildId }) {
       {badgeCelebration && (
         <div className="celebration" role="dialog" aria-label="Weekly challenge complete!">
           <div className="celebration-card">
-            <p className="celebration-text">🏅 {badgeCelebration} — done!</p>
+            <p className="celebration-text">
+              <MedalIcon size={30} /> {badgeCelebration} — done!
+            </p>
             <p className="celebration-sub">+20 coins and a new badge!</p>
             <button className="btn btn-yes" onClick={() => setBadgeCelebration(null)}>
               Hooray!

@@ -7,6 +7,7 @@ import { WEEKLY_TEMPLATES, weeklyTemplateById } from '../../data/weekly'
 import { eligibleWeeklyTemplates, weeklyTemplateFor } from '../../domain/commands'
 import { mondayKeyOf } from '../../domain/week'
 import { useGameState, useRepository } from '../../storage/hooks'
+import { CheckIcon } from './FlatIcons'
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -118,7 +119,7 @@ export function ScheduleEditor({ childId, pin }: { childId: ChildId; pin: string
                 aria-label={`${q.label} on ${WEEKDAYS[d]}`}
                 aria-pressed={(core[d] ?? []).includes(q.id)}
               >
-                {(core[d] ?? []).includes(q.id) ? '✓' : ''}
+                {(core[d] ?? []).includes(q.id) ? <CheckIcon size={18} /> : null}
               </button>
             ))}
           </div>

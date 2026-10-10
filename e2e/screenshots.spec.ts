@@ -331,18 +331,18 @@ test('capture the v6 screens', async ({ browser }, testInfo) => {
       { id: 'postcard-road', projectId: 'road', openedAt: '2026-09-28T10:00:00Z' },
       { id: 'postcard-library', projectId: 'library', openedAt: '2026-10-01T10:00:00Z' },
     ]
-    s.claims['jr1'] = {
-      id: 'jr1', childId: 'leonard', questId: 'reading', activityDate: '2026-10-08',
-      role: 'core', status: 'approved', claimedAt: '2026-10-08T10:00:00Z',
-      reward: { coins: 10, stars: 1 },
-      details: { kind: 'reading', unit: 'book', title: 'Dragons Love Tacos', withGrownUp: false },
+    const readClaim = (i: number, childId: 'theodore' | 'leonard', unit: 'book' | 'chapter', date: string) => {
+      s.claims[`jr${i}`] = {
+        id: `jr${i}`, childId, questId: 'reading', activityDate: date,
+        role: i === 1 ? 'core' : 'bonus', status: 'approved', claimedAt: `${date}T10:00:00Z`,
+        reward: { coins: i === 1 ? 10 : 5, stars: i === 1 ? 1 : 0 },
+        details: { kind: 'reading', unit, withGrownUp: false },
+      }
     }
-    s.claims['jr2'] = {
-      id: 'jr2', childId: 'theodore', questId: 'reading', activityDate: '2026-10-09',
-      role: 'bonus', status: 'approved', claimedAt: '2026-10-09T10:00:00Z',
-      reward: { coins: 5, stars: 0 },
-      details: { kind: 'reading', unit: 'chapter', withGrownUp: false },
-    }
+    for (let i = 1; i <= 6; i += 1) readClaim(i, 'leonard', 'book', '2026-10-08')
+    for (let i = 7; i <= 9; i += 1) readClaim(i, 'theodore', 'book', '2026-10-09')
+    for (let i = 10; i <= 13; i += 1) readClaim(i, 'leonard', 'chapter', '2026-10-10')
+    for (let i = 14; i <= 15; i += 1) readClaim(i, 'theodore', 'chapter', '2026-10-11')
     // a repaired incident for the acknowledgment card
     s.repairs['inc-a'] = {
       id: 'inc-a', childId: 'leonard', situation: 'scattering',
@@ -374,26 +374,22 @@ test('capture the v6 screens', async ({ browser }, testInfo) => {
     await context.close()
   }
 
-  // --- each building's play view via canvas tap ---
-  const plot = async (page: Page, wx: number, wy: number) => {
-    const box = await page.locator('.island-wrap canvas').boundingBox()
-    const sc = Math.min(box!.width / 1000, box!.height / 700)
-    const offX = box!.x + (box!.width - 1000 * sc) / 2
-    const offY = box!.y + (box!.height - 700 * sc) / 2
-    await page.mouse.click(offX + wx * sc, offY + wy * sc)
-  }
-  const plays: [string, number, number, string][] = [
-    ['library', 225, 545, '41-play-library'],
-    ['music-school', 760, 560, '42-play-music'],
-    ['police-station', 340, 190, '43-play-police'],
-    ['hospital', 660, 185, '44-play-hospital'],
+  // --- each building's play view (opened via the town-tap test hook) ---
+  const plays: [string, string][] = [
+    ['library', '41-play-library'],
+    ['music-school', '42-play-music'],
+    ['police-station', '43-play-police'],
+    ['hospital', '44-play-hospital'],
   ]
-  for (const [, wx, wy, shotName] of plays) {
+  for (const [name, shotName] of plays) {
     const s = await seededPage(browser, p, seedJson(openTown))
     await s.page.goto('/')
     await s.page.getByRole('button', { name: 'Leonard' }).click()
     await expect(s.page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
-    await plot(s.page, wx, wy)
+    await s.page.waitForTimeout(500)
+    await s.page.evaluate((id) => {
+      ;(window as unknown as { __townTap: (p: string) => void }).__townTap(id)
+    }, name)
     await s.page.getByRole('button', { name: 'Play!' }).click()
     await s.page.waitForTimeout(500)
     await shotOverlay(s.page, p, shotName)
@@ -413,7 +409,9 @@ test('capture the v6 screens', async ({ browser }, testInfo) => {
     await s.page.waitForSelector('.sheet-backdrop', { state: 'detached' })
     await s.page.waitForTimeout(200)
 
-    await plot(s.page, 225, 545)
+    await s.page.evaluate(() => {
+      ;(window as unknown as { __townTap: (p: string) => void }).__townTap('library')
+    })
     await expect(s.page.getByRole('dialog', { name: /Library|Rainbow/ })).toBeVisible()
     await s.page.getByRole('button', { name: 'Change colors' }).click()
     await s.page.waitForTimeout(450)

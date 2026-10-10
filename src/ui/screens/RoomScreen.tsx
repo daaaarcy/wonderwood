@@ -58,7 +58,7 @@ export function RoomScreen({ childId }: { childId: ChildId }) {
       </button>
       {album && (
         <div className="sheet-backdrop" onClick={() => setAlbum(false)}>
-          <div className="sheet" role="dialog" aria-label="Postcard album" onClick={(e) => e.stopPropagation()}>
+          <div className="sheet album-sheet" role="dialog" aria-label="Postcard album" onClick={(e) => e.stopPropagation()}>
             <p className="sheet-title">Our postcards</p>
             <PostcardAlbum state={state} />
             <button className="btn btn-neutral" onClick={() => setAlbum(false)}>Close</button>

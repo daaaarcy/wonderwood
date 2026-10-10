@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <ellipse cx="52" cy="94" rx="30" ry="4" fill="#3c3c3c" opacity="0.08"/>
+  <!-- ears -->
+  <ellipse cx="38" cy="18" rx="8" ry="18" fill="#e8e8e8" transform="rotate(-8 38 18)"/>
+  <ellipse cx="58" cy="16" rx="8" ry="18" fill="#e8e8e8" transform="rotate(10 58 16)"/>
+  <ellipse cx="38" cy="20" rx="4" ry="12" fill="#ffb3c6" transform="rotate(-8 38 20)"/>
+  <ellipse cx="58" cy="18" rx="4" ry="12" fill="#ffb3c6" transform="rotate(10 58 18)"/>
+  <!-- body -->
+  <ellipse cx="56" cy="70" rx="26" ry="22" fill="#efefef"/>
+  <!-- head -->
+  <circle cx="40" cy="46" r="19" fill="#efefef"/>
+  <circle cx="34" cy="42" r="3" fill="#3c3c3c"/>
+  <circle cx="48" cy="42" r="3" fill="#3c3c3c"/>
+  <ellipse cx="40" cy="52" rx="4" ry="3" fill="#ffb3c6"/>
+  <!-- feet -->
+  <ellipse cx="36" cy="88" rx="10" ry="5" fill="#e0e0e0"/>
+  <ellipse cx="70" cy="88" rx="10" ry="5" fill="#e0e0e0"/>
+  <!-- tail -->
+  <circle cx="80" cy="72" r="7" fill="#ffffff"/>
+</svg>

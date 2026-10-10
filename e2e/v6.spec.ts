@@ -90,7 +90,7 @@ test('police station: patrol car returns a lost toy', async ({ page }) => {
   await expect(page.getByRole('dialog', { name: 'Police station' })).toBeVisible()
   await page.getByRole('button', { name: 'Play!' }).click()
   await expect(page.getByTestId('patrol-map')).toBeVisible()
-  await page.getByRole('button', { name: 'Pick up a teddy' }).click()
+  await page.getByRole('button', { name: 'Pick up the teddy' }).click()
   await expect(page.locator('.lost-toy')).toHaveCount(2, { timeout: 5000 })
 })
 
@@ -217,7 +217,7 @@ test('reset & repair: grown-up logs → repaired → only that child sees thanks
   await panel.getByLabel('Situation').selectOption('spitting')
   await expect(page.getByTestId('repair-suggestion')).toContainText('clean the spot')
   await panel.getByRole('button', { name: 'Write it down' }).click()
-  await panel.getByRole('button', { name: 'Repaired ✓' }).click()
+  await panel.getByRole('button', { name: 'Repaired' }).click()
   await page.getByRole('button', { name: 'Done — back to explorers' }).click()
   // Leonard sees the thank-you card
   await pickExplorer(page, 'Leonard')

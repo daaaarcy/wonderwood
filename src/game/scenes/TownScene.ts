@@ -66,6 +66,8 @@ export class TownScene extends Phaser.Scene {
     this.load.svg('bridge-plank', 'assets/bridge-plank.svg', { width: 128, height: 56 })
     this.load.svg('kit-box', 'assets/kit-box.svg', { width: 128, height: 128 })
     this.load.svg('truck', 'assets/truck.svg', { width: 280, height: 180 })
+    this.load.svg('resident-fox', 'assets/resident-fox.svg', { width: 120, height: 90 })
+    this.load.svg('resident-rabbit', 'assets/resident-rabbit.svg', { width: 100, height: 100 })
     this.load.svg('star', 'assets/star.svg', { width: 96, height: 96 })
     for (const key of ['icon-road', 'icon-library', 'icon-music', 'icon-police', 'icon-hospital']) {
       this.load.svg(key, `assets/${key}.svg`, { width: 96, height: 96 })
@@ -93,6 +95,8 @@ export class TownScene extends Phaser.Scene {
       })
       this.rendered.set(def.id, { container, kits: -1, status: 'locked', marker: '' })
     }
+
+    this.buildAmbient()
 
     this.buildExplorers()
     this.buildTruck()
@@ -198,6 +202,160 @@ export class TownScene extends Phaser.Scene {
     }
     const p = this.truckPath.getPoint(this.truckT)
     this.truck.setPosition(p.x, p.y)
+  }
+
+  /* ---------------- ambient life ---------------- */
+
+  private get reducedMotion() {
+    return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+  }
+
+  /** Trees, beds, lamp posts, fountain sparkle, chimney smoke, wandering
+   *  friends — the calm picture-book dressing around the tappable town. */
+  private buildAmbient() {
+    const g = this.add.graphics().setDepth(1)
+
+    // flower beds framing each plot
+    const bedColors = [0xff7b9c, 0xf2c40f, 0xffffff, 0x9a6fe0]
+    for (const def of PROJECTS) {
+      if (def.id === 'road') continue
+      const bx = def.pos.x - 96
+      const by = def.pos.y + 66
+      for (let i = 0; i < 4; i += 1) {
+        const x = bx + i * 24
+        g.fillStyle(0x3f9e34, 0.9)
+        g.fillEllipse(x, by + 10, 26, 14)
+        g.fillStyle(bedColors[(i + PROJECTS.indexOf(def)) % 4] ?? 0xffffff, 1)
+        g.fillCircle(x, by + 4, 5)
+        g.fillStyle(0xf2c40f, 1)
+        g.fillCircle(x, by + 4, 2)
+      }
+    }
+
+    // lamp posts along the road
+    for (const [x, y] of [
+      [640, 408],
+      [880, 406],
+    ]) {
+      g.fillStyle(0x5a5a5a, 1)
+      g.fillRoundedRect(x - 3, y - 46, 6, 50, 3)
+      g.fillStyle(0xf2c40f, 1)
+      g.fillCircle(x, y - 48, 9)
+      g.fillStyle(0xfff3b8, 0.4)
+      g.fillCircle(x, y - 48, 14)
+    }
+
+    // bushes + trees framing the square
+    for (const [x, y, r, c] of [
+      [300, 610, 16, 0x3f9e34],
+      [700, 610, 18, 0x3f9e34],
+      [90, 430, 14, 0x58cc02],
+      [920, 530, 15, 0x3f9e34],
+      [120, 620, 17, 0x58cc02],
+      [860, 640, 15, 0x3f9e34],
+      [500, 130, 16, 0x58cc02],
+    ] as const) {
+      g.fillStyle(c, 1)
+      g.fillCircle(x, y, r)
+      g.fillCircle(x - r * 0.7, y + r * 0.3, r * 0.7)
+      g.fillCircle(x + r * 0.7, y + r * 0.3, r * 0.7)
+    }
+
+    // little fountain on the square's west edge
+    const fx = 372
+    const fy = 470
+    g.fillStyle(0xd9d9d9, 1)
+    g.fillEllipse(fx, fy, 74, 30)
+    g.fillStyle(0x7fd4f0, 1)
+    g.fillEllipse(fx, fy - 4, 58, 20)
+    g.fillStyle(0xd9d9d9, 1)
+    g.fillEllipse(fx, fy - 16, 22, 10)
+
+    const rm = this.reducedMotion
+    // fountain sparkle
+    if (!rm) {
+      for (let i = 0; i < 3; i += 1) {
+        const spark = this.add.star(fx - 8 + i * 8, fy - 26, 4, 2, 6, 0xffffff)
+        this.tweens.add({
+          targets: spark,
+          y: fy - 40,
+          alpha: 0,
+          scale: 0.4,
+          duration: 900 + i * 300,
+          repeat: -1,
+          repeatDelay: 400 * i,
+          onComplete: () => spark.setPosition(fx - 8 + i * 8, fy - 26).setAlpha(1).setScale(1),
+        })
+      }
+      // chimney smoke for both houses (top corners of the bg)
+      for (const hx of [96, 906]) {
+        for (let i = 0; i < 2; i += 1) {
+          const puff = this.add.circle(hx + i * 6, 58, 7 + i * 2, 0xffffff, 0.75)
+          this.tweens.add({
+            targets: puff,
+            y: 14,
+            alpha: 0,
+            scale: 1.9,
+            duration: 2400,
+            delay: i * 900,
+            repeat: -1,
+            onRepeat: () => puff.setPosition(hx + i * 6, 58).setAlpha(0.75).setScale(1),
+          })
+        }
+      }
+      // two drifting butterflies
+      for (const [bx, by, col] of [
+        [250, 300, 0xf2c40f],
+        [740, 320, 0xff7b9c],
+      ] as const) {
+        const b = this.add.container(bx, by)
+        const l = this.add.ellipse(-4, 0, 9, 13, col).setRotation(-0.5)
+        const r = this.add.ellipse(4, 0, 9, 13, col).setRotation(0.5)
+        const body = this.add.rectangle(0, 0, 3, 10, 0x3c3c3c).setRotation(0.2)
+        b.add([l, r, body])
+        b.setDepth(2)
+        this.tweens.add({
+          targets: b,
+          x: bx + 90,
+          y: by + Phaser.Math.Between(-50, 50),
+          duration: 5200,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+        })
+      }
+      // wandering friends
+      this.wander(this.add.image(90, 632, 'resident-fox').setDisplaySize(88, 66), 90, 170)
+      this.wander(this.add.image(880, 330, 'resident-rabbit').setDisplaySize(62, 62).setFlipX(true), 880, 700)
+    } else {
+      // reduced motion — the friends still say hello, just standing still
+      this.add.image(90, 632, 'resident-fox').setDisplaySize(88, 66)
+      this.add.image(880, 330, 'resident-rabbit').setDisplaySize(62, 62)
+    }
+  }
+
+  /** Slow stroll between two spots, bobbing gently along the way. */
+  private wander(img: Phaser.GameObjects.Image, a: number, b: number) {
+    img.setDepth(2)
+    const go = (to: number) => {
+      img.setFlipX(to < img.x)
+      this.tweens.add({
+        targets: img,
+        x: to,
+        duration: Math.abs(to - img.x) * 40,
+        ease: 'Sine.easeInOut',
+        onComplete: () => this.time.delayedCall(1600, () => go(to === a ? b : a)),
+      })
+      this.tweens.add({
+        targets: img,
+        y: img.y - 4,
+        duration: 400,
+        yoyo: true,
+        repeat: Math.max(1, Math.round(Math.abs(to - img.x) / 60)),
+        ease: 'Sine.easeInOut',
+      })
+    }
+    go(b)
   }
 
   /* ---------------- explorers ---------------- */

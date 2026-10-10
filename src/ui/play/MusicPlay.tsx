@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { assetUrl } from '../../game/assets'
+import { MusicNoteIcon } from '../components/FlatIcons'
 
 const NOTES = [
   { name: 'C', freq: 261.63, color: '#e0483e' },
@@ -9,17 +10,17 @@ const NOTES = [
   { name: 'G', freq: 392.0, color: '#4a9ede' },
   { name: 'A', freq: 440.0, color: '#9a6fe0' },
   { name: 'B', freq: 493.88, color: '#ff7b9c' },
-  { name: 'C♪', freq: 523.25, color: '#1cb0f6' },
+  { name: 'C2', freq: 523.25, color: '#1cb0f6' },
 ]
 
-/** A cheerful little tune (note indices + beat). */
+/** A cheerful little tune (note indices in order). */
 const TUNE: number[] = [0, 2, 4, 0, 4, 5, 4, 2, 0, 4, 7, 4, 5, 4, 2, 0]
 
 export function MusicPlay({ soundOn }: { soundOn: boolean }) {
   const ctxRef = useRef<AudioContext | null>(null)
   const [show, setShow] = useState(false)
   const [hitBar, setHitBar] = useState<number | null>(null)
-  const [notes, setNotes] = useState<number[]>([])
+  const [notes, setNotes] = useState<number>(0)
 
   const audio = () => {
     ctxRef.current ??= new AudioContext()
@@ -30,7 +31,7 @@ export function MusicPlay({ soundOn }: { soundOn: boolean }) {
   const strike = (i: number, when = 0) => {
     setHitBar(i)
     setTimeout(() => setHitBar(null), 200)
-    setNotes((n) => [...n, i])
+    setNotes((n) => n + 1)
     if (!soundOn) return
     try {
       const ctx = audio()
@@ -60,27 +61,40 @@ export function MusicPlay({ soundOn }: { soundOn: boolean }) {
   return (
     <div className="music-play">
       <div className={`music-stage ${show ? 'showing' : ''}`} data-testid="music-stage">
+        {/* stage curtains */}
+        <div className="curtain curtain-left" aria-hidden="true" />
+        <div className="curtain curtain-right" aria-hidden="true" />
+        <div className="curtain-valance" aria-hidden="true" />
+        <div className="stage-floor" aria-hidden="true" />
+        <div className="spotlight spot-left" aria-hidden="true" />
+        <div className="spotlight spot-right" aria-hidden="true" />
         <img src={assetUrl('explorer-theodore')} alt="Theodore" className="stage-explorer bop-left" />
         <img src={assetUrl('explorer-leonard')} alt="Leonard" className="stage-explorer bop-right" />
-        {notes.slice(-6).map((_n, i) => (
-          <span key={`${notes.length}-${i}`} className="float-note" style={{ left: `${20 + i * 12}%` }}>
-            ♪
+        {Array.from({ length: Math.min(notes, 6) }).map((_, i) => (
+          <span key={`${notes}-${i}`} className="float-note" style={{ left: `${22 + i * 11}%` }}>
+            <MusicNoteIcon size={26} />
           </span>
         ))}
       </div>
       {!soundOn && <p className="muted">Sound is off — watch the show anyway!</p>}
-      <div className="xylo" data-testid="xylo">
-        {NOTES.map((n, i) => (
-          <button
-            key={n.name + i}
-            className={`xylo-bar ${hitBar === i ? 'struck' : ''}`}
-            style={{ background: n.color, height: `${150 - i * 11}px` }}
-            onClick={() => strike(i)}
-            aria-label={`Note ${n.name}`}
-          >
-            <span>{n.name}</span>
-          </button>
-        ))}
+      {/* xylophone on a wooden frame */}
+      <div className="xylo-frame" data-testid="xylo">
+        <div className="xylo-rail rail-top" />
+        <div className="xylo-bars">
+          {NOTES.map((n, i) => (
+            <button
+              key={n.name + i}
+              className={`xylo-bar ${hitBar === i ? 'struck' : ''}`}
+              style={{ background: n.color, height: `${140 - i * 10}px` }}
+              onClick={() => strike(i)}
+              aria-label={`Note ${n.name}`}
+            >
+              <span className="xylo-peg" />
+              <span className="xylo-peg peg-bottom" />
+            </button>
+          ))}
+        </div>
+        <div className="xylo-rail rail-bottom" />
       </div>
       <button className="btn btn-yes btn-big" onClick={startShow} disabled={show}>
         {show ? 'Show time!' : 'Start the show'}

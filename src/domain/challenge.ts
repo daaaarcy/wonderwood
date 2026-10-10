@@ -8,7 +8,7 @@ export type MathLevel = 1 | 2 | 3
 export interface ChallengeQuestion {
   /** kid-facing prompt text */
   prompt: string
-  /** emoji tokens to picture (e.g. 4× '🧱' for count/bricks) */
+  /** picture tokens to draw (e.g. 4× 'box' for count) */
   picture: string[]
   /** optional second group for "which is more" questions */
   pictureB?: string[]
@@ -35,7 +35,7 @@ export function rngFromSeed(seed: string): () => number {
   }
 }
 
-const BRICKS = ['🧱', '📦', '🪨', '🪵', '⭐', '🍎']
+const BRICKS = ['brick', 'box', 'rock', 'log', 'star', 'apple']
 
 function pick<T>(rng: () => number, arr: T[]): T {
   return arr[Math.floor(rng() * arr.length)]
@@ -117,7 +117,7 @@ function addSub(rng: () => number, max: number): ChallengeQuestion {
   return {
     prompt: `${a} ${add ? '+' : '−'} ${b} = ?`,
     picture: Array.from({ length: a }, () => token),
-    pictureB: Array.from({ length: b }, () => (add ? '➕' : '❌')),
+    pictureB: Array.from({ length: b }, () => (add ? 'add' : 'away')),
     options,
     answerIndex,
     hint: add ? `Start at ${a}, then count on ${b} more.` : `Start at ${a}, take away ${b}.`,
@@ -131,7 +131,7 @@ function groupsQuestion(rng: () => number): ChallengeQuestion {
   const { options, answerIndex } = optionsFor(rng, answer, [answer - mult, answer + mult, answer + 1])
   return {
     prompt: `${groups} boxes of ${mult} bricks — how many bricks?`,
-    picture: Array.from({ length: groups }, () => '📦'),
+    picture: Array.from({ length: groups }, () => 'box'),
     options,
     answerIndex,
     hint: `Count by ${mult}s: ${Array.from({ length: groups }, (_, i) => mult * (i + 1)).join(', ')}…`,

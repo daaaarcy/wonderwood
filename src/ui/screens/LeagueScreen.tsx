@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { badgesFor, leagueWeekStatus } from '../../domain/selectors'
 import { weeklyTemplateById } from '../../data/weekly'
+import { MedalIcon } from '../components/FlatIcons'
 import type { ChildId } from '../../domain/types'
 import { CHILDREN, CHILD_LIST } from '../../data/children'
 import { LEAGUES, leagueTitle } from '../../data/leagues'
@@ -79,7 +80,7 @@ export function LeagueScreen({ childId }: { childId: ChildId }) {
           <ul className="badge-list">
             {badgesFor(state, childId).map((b) => (
               <li key={b.id} className="badge-row">
-                <span className="badge-medal" aria-hidden="true">🏅</span>
+                <span className="badge-medal" aria-hidden="true"><MedalIcon size={30} /></span>
                 <span className="badge-title">{weeklyTemplateById(b.templateId)?.title ?? 'Weekly challenge'}</span>
                 <span className="muted">{new Date(b.earnedAt).toLocaleDateString()}</span>
               </li>
