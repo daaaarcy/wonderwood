@@ -12,6 +12,8 @@ export interface TownStatePayload {
   suggestedProjectId: ProjectId | null
   hats: Record<ChildId, string | null>
   foundersPlanks: number
+  cityName: string | null
+  looks: Record<ProjectId, { color: string | null; name: string | null }>
 }
 
 const EXPLORER_HEIGHT = 118
@@ -81,7 +83,10 @@ export class TownScene extends Phaser.Scene {
     for (const def of PROJECTS) {
       const container = this.add.container(def.pos.x, def.pos.y)
       container.setSize(210, 170)
-      container.setInteractive({ useHandCursor: true })
+      container.setInteractive(
+        new Phaser.Geom.Rectangle(-105, -85, 210, 170),
+        Phaser.Geom.Rectangle.Contains,
+      )
       container.on('pointerdown', () => {
         EventBus.emit('town-tap', { kind: 'plot', projectId: def.id })
         this.tweens.add({ targets: container, scale: 1.04, duration: 120, yoyo: true })
@@ -94,6 +99,10 @@ export class TownScene extends Phaser.Scene {
     this.startBlinkLoop()
 
     EventBus.on('town-state', this.applyState, this)
+    EventBus.on('town-ride', this.onRideRequest, this)
+    const detachRide = () => EventBus.off('town-ride', this.onRideRequest, this)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, detachRide)
+    this.events.once(Phaser.Scenes.Events.DESTROY, detachRide)
     // game.destroy() fires DESTROY rather than SHUTDOWN — listen for both so a
     // dead scene never receives React state pushes.
     const detach = () => EventBus.off('town-state', this.applyState, this)
@@ -103,12 +112,79 @@ export class TownScene extends Phaser.Scene {
     EventBus.emit('scene-ready', 'TownScene')
   }
 
-  /** Cover-fit the backdrop and keep the world centered at any canvas size. */
+  /**
+   * Contain-fit: the WHOLE town (houses, square, road, all plots, stream) is
+   * always inside the camera view. Any extra canvas space is filled by
+   * extending the world edges — grass, trees, flowers, distant hills.
+   */
+  private marginGroup?: Phaser.GameObjects.Container
+  private groundFill?: Phaser.GameObjects.Rectangle
+
   private layout() {
     const w = this.scale.width
     const h = this.scale.height
-    const s = Math.max(w / GAME_WIDTH, h / GAME_HEIGHT)
-    this.bg.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2).setDisplaySize(GAME_WIDTH * s, GAME_HEIGHT * s)
+    const s = Math.min(w / GAME_WIDTH, h / GAME_HEIGHT)
+    const viewW = w / s
+    const viewH = h / s
+
+    // grass fills the whole visible area, then the painted backdrop on top
+    if (!this.groundFill) {
+      this.groundFill = this.add
+        .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 1, 1, 0x7ed957)
+        .setDepth(-10)
+    }
+    this.groundFill.setDisplaySize(viewW + 60, viewH + 60)
+    this.bg.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2).setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+
+    // margin scenery — rebuilt on each resize (cheap, a dozen shapes)
+    if (this.marginGroup) this.marginGroup.destroy(true)
+    const g = this.add.container(0, 0).setDepth(-9)
+    this.marginGroup = g
+    const left = (GAME_WIDTH - viewW) / 2
+    const top = (GAME_HEIGHT - viewH) / 2
+    const tree = (x: number, y: number, r: number, c: number) => {
+      g.add(this.add.circle(x, y, r, c))
+      g.add(this.add.rectangle(x, y + r * 0.9, r * 0.24, r * 0.7, 0x96683f))
+    }
+    const flower = (x: number, y: number, c: number) => {
+      g.add(this.add.circle(x, y, 4, c))
+    }
+    // side bands — treelines mirroring the backdrop
+    for (let x = left + 40; x < left + viewW - 40; x += 130) {
+      if (top < 0) {
+        // extra space above — distant hills + treeline
+        g.add(this.add.circle(x, top + 30, 70, 0x46a302))
+        g.add(this.add.circle(x + 60, top + 10, 55, 0x58cc02))
+      }
+      if (GAME_HEIGHT + viewH - top - viewH > 0) {
+        // bottom band — bushes + flowers
+        const by = GAME_HEIGHT + (-top) / 2 + 20
+        if (by < GAME_HEIGHT + viewH / 2 - 10) {
+          g.add(this.add.circle(x, GAME_HEIGHT + 20 + (x % 3) * 8, 42, 0x46a302))
+        }
+      }
+    }
+    for (let y = 40; y < GAME_HEIGHT + viewH; y += 150) {
+      if (left < 0) {
+        tree(left + 60 + (y % 2) * 24, y - top - GAME_HEIGHT / 2 + 350 > 700 ? 700 : y, 44, 0x46a302)
+      }
+      if (GAME_WIDTH + viewW - left - viewW > 0) {
+        // right margin
+        const rx = GAME_WIDTH - left - 0
+        if (rx < GAME_WIDTH + viewW / 2 + left) {
+          tree(GAME_WIDTH + 60, y, 44, 0x46a302)
+        }
+      }
+    }
+    // flowers scattered in margins
+    const cols = [0xf2c40f, 0xff7b9c, 0xffffff]
+    for (let i = 0; i < 24; i += 1) {
+      const fx = left + 30 + (i * 137) % Math.max(60, viewW - 60)
+      const fy = top + 30 + (i * 211) % Math.max(60, viewH - 60)
+      if (fx > 10 && fx < GAME_WIDTH - 10 && fy > 10 && fy < GAME_HEIGHT - 10) continue
+      flower(fx, fy, cols[i % 3] ?? 0xffffff)
+    }
+    this.cameras.main.setZoom(s)
     this.cameras.main.centerOn(GAME_WIDTH / 2, GAME_HEIGHT / 2)
   }
 
@@ -140,10 +216,129 @@ export class TownScene extends Phaser.Scene {
       outer.setData('bobber', bobber)
       outer.setSize(90, EXPLORER_HEIGHT)
       outer.setInteractive({ useHandCursor: true })
-      outer.on('pointerdown', () => this.cheer(id))
+      outer.on('pointerdown', () => this.tapExplorer(id))
       this.explorers[id] = outer
       this.explorerHats[id] = null
     }
+  }
+
+  private lastExplorerTap: { id: ChildId; t: number } | null = null
+
+  /** Tap one explorer then the other within 2s → high-five between them. */
+  private tapExplorer(id: ChildId) {
+    const now = this.time.now
+    const last = this.lastExplorerTap
+    this.lastExplorerTap = { id, t: now }
+    const other: ChildId = id === 'theodore' ? 'leonard' : 'theodore'
+    if (last && last.id === other && now - last.t < 2000) {
+      this.highFive()
+      this.lastExplorerTap = null
+      return
+    }
+    this.cheer(id)
+  }
+
+  private highFive() {
+    const t = this.explorers.theodore
+    const l = this.explorers.leonard
+    if (!t || !l || t.getData('cheering') || l.getData('cheering')) return
+    t.setData('cheering', true)
+    l.setData('cheering', true)
+    const tb = t.getData('body') as Phaser.GameObjects.Image
+    const lb = l.getData('body') as Phaser.GameObjects.Image
+    tb.setTexture('explorer-theodore-cheer')
+    lb.setTexture('explorer-leonard-cheer')
+    // hop toward each other
+    for (const [c, dir] of [[t, -1], [l, 1]] as const) {
+      const bobber = c.getData('bobber') as Phaser.GameObjects.Container
+      this.tweens.add({
+        targets: bobber,
+        x: dir * 22,
+        y: -20,
+        duration: 220,
+        yoyo: true,
+        ease: 'Quad.easeOut',
+      })
+    }
+    // burst of little stars between them
+    const mx = (t.x + l.x) / 2
+    const my = Math.min(t.y, l.y) - 120
+    for (let i = 0; i < 5; i += 1) {
+      const star = this.add.image(mx, my, 'star').setDisplaySize(18, 18).setScale(0)
+      this.tweens.add({
+        targets: star,
+        scale: 1,
+        x: mx + (i - 2) * 26,
+        y: my - 14 - (i % 2) * 12,
+        duration: 260,
+        delay: 120 + i * 40,
+        ease: 'Back.easeOut',
+        onComplete: () => this.tweens.add({ targets: star, alpha: 0, scale: 0.3, duration: 240, delay: 260, onComplete: () => star.destroy() }),
+      })
+    }
+    this.time.delayedCall(900, () => {
+      t.setData('cheering', false)
+      l.setData('cheering', false)
+      if (tb.scene) tb.setTexture('explorer-theodore')
+      if (lb.scene) lb.setTexture('explorer-leonard')
+    })
+  }
+
+  /**
+   * "Ride along!" — the current child's explorer hops in the truck and rides
+   * one lap of the road, waving. No coins — just for fun.
+   */
+  private riding = false
+  private onRideRequest(childId: ChildId) {
+    this.rideAlong(childId)
+  }
+  public rideAlong(childId: ChildId) {
+    if (this.riding || !this.truck) return
+    const outer = this.explorers[childId]
+    if (!outer) return
+    this.riding = true
+    const truck = this.truck
+    truck.setVisible(true).setFlipX(false)
+    const body = outer.getData('body') as Phaser.GameObjects.Image
+    const homeX = outer.x
+    const homeY = outer.y
+    // hop in — explorer rides the cab, cheering/waving
+    body.setTexture(`explorer-${childId}-cheer`)
+    this.tweens.add({
+      targets: outer,
+      x: truck.x,
+      y: truck.y - 46,
+      duration: 400,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        const lap = { t: 0 }
+        this.tweens.add({
+          targets: lap,
+          t: 1,
+          duration: 4200,
+          ease: 'Linear',
+          onUpdate: () => {
+            const p = this.truckPath.getPoint(lap.t)
+            truck.setPosition(p.x, p.y)
+            outer.setPosition(p.x, p.y - 46)
+          },
+          onComplete: () => {
+            // hop back out to the square
+            this.tweens.add({
+              targets: outer,
+              x: homeX,
+              y: homeY,
+              duration: 420,
+              ease: 'Quad.easeOut',
+              onComplete: () => {
+                if (body.scene) body.setTexture(`explorer-${childId}`)
+                this.riding = false
+              },
+            })
+          },
+        })
+      },
+    })
   }
 
   private cheer(id: ChildId) {
@@ -352,6 +547,8 @@ export class TownScene extends Phaser.Scene {
 
   /* ---------------- plot art ---------------- */
 
+  private looks: TownStatePayload['looks'] | null = null
+
   private renderPlot(def: ProjectDef, kits: number, status: ProjectStatus, marker: string, suggested: boolean) {
     const r = this.rendered.get(def.id)
     if (!r) return
@@ -365,7 +562,7 @@ export class TownScene extends Phaser.Scene {
     } else if (def.id === 'road') {
       this.drawRoad(r.container, g, status, kits, def)
     } else if (status === 'open') {
-      this.drawBuilding(r.container, g, def)
+      this.drawBuilding(r.container, g, def, this.looks?.[def.id] ?? undefined)
     } else {
       const p = kits / def.kits
       if (kits === 0) this.drawSite(r.container, g, def)
@@ -497,8 +694,13 @@ export class TownScene extends Phaser.Scene {
     g.lineBetween(-88, -36, 88, -36)
   }
 
-  private drawBuilding(container: Phaser.GameObjects.Container, g: Phaser.GameObjects.Graphics, def: ProjectDef) {
-    const color = Phaser.Display.Color.HexStringToColor(def.color).color
+  private drawBuilding(
+    container: Phaser.GameObjects.Container,
+    g: Phaser.GameObjects.Graphics,
+    def: ProjectDef,
+    look?: { color: string | null; name: string | null },
+  ) {
+    const color = Phaser.Display.Color.HexStringToColor(look?.color ?? def.color).color
     g.fillStyle(0x3c3c3c, 0.08)
     g.fillEllipse(0, 44, 170, 22)
     g.fillStyle(0xfff8ee, 1)
@@ -520,6 +722,44 @@ export class TownScene extends Phaser.Scene {
     g.fillTriangle(0, -120, 28, -113, 0, -106)
     const icon = this.add.image(0, -58, def.iconKey).setDisplaySize(22, 22)
     container.add(icon)
+    // bespoke touches per building
+    if (def.id === 'music-school') {
+      g.fillStyle(color, 1)
+      g.fillRoundedRect(-78, 28, 156, 16, 6)
+      g.fillStyle(0xffffff, 1)
+      for (const x of [-56, -24, 8, 40]) g.fillCircle(x, 36, 5)
+    }
+    if (def.id === 'police-station') {
+      g.fillStyle(0xffffff, 1)
+      g.fillRoundedRect(-40, 10, 80, 20, 8)
+      g.fillStyle(color, 1)
+      g.fillRoundedRect(-36, 13, 72, 14, 6)
+    }
+    if (def.id === 'hospital') {
+      g.fillStyle(color, 1)
+      g.fillRoundedRect(-14, -36, 28, 10, 3)
+      g.fillRoundedRect(-5, -45, 10, 28, 3)
+    }
+    if (def.id === 'library') {
+      g.fillStyle(0xffffff, 1)
+      g.fillRoundedRect(-66, 18, 132, 12, 5)
+      g.fillStyle(color, 1)
+      for (const x of [-60, -36, -12, 12, 36, 60]) g.fillRoundedRect(x - 4, 19, 8, 10, 2)
+    }
+    // custom name plaque above the door
+    if (look?.name) {
+      const pl = this.add.container(0, -104)
+      const pg = this.add.graphics()
+      pg.fillStyle(0xffffff, 1)
+      pg.fillRoundedRect(-62, -14, 124, 26, 9)
+      pg.lineStyle(3, color, 1)
+      pg.strokeRoundedRect(-62, -14, 124, 26, 9)
+      const t = this.add
+        .text(0, -1, look.name, { fontFamily: FONT, fontSize: '14px', fontStyle: '900', color: '#3c3c3c' })
+        .setOrigin(0.5)
+      pl.add([pg, t])
+      container.add(pl)
+    }
   }
 
   /* ---- the road project ---- */
@@ -589,6 +829,7 @@ export class TownScene extends Phaser.Scene {
 
   private applyState(payload: TownStatePayload) {
     if (!this.sys.displayList) return
+    this.looks = payload.looks
     this.foundersPlanks = payload.foundersPlanks
     this.buildFoundersBridge()
 
@@ -602,7 +843,7 @@ export class TownScene extends Phaser.Scene {
         def,
         next?.kits ?? 0,
         next?.status ?? 'locked',
-        `${payload.currentProjectId}:${payload.suggestedProjectId}:${next?.status}:${next?.kits}`,
+        `${payload.currentProjectId}:${payload.suggestedProjectId}:${next?.status}:${next?.kits}:${payload.looks[def.id]?.color}:${payload.looks[def.id]?.name}`,
         payload.suggestedProjectId === def.id,
       )
     }
@@ -618,6 +859,49 @@ export class TownScene extends Phaser.Scene {
     if (this.truck) {
       const roadOpen = payload.projects.road?.status === 'open'
       if (!this.truckDelivering) this.truck.setVisible(roadOpen)
+    }
+
+    this.renderWelcomeSign(payload.cityName)
+    this.renderLooks(payload)
+  }
+
+  /* ---------------- town welcome sign + building looks ---------------- */
+
+  private welcomeSign?: Phaser.GameObjects.Container
+  private welcomeLabel?: Phaser.GameObjects.Text
+
+  private renderWelcomeSign(cityName: string | null) {
+    if (!cityName) return
+    if (!this.welcomeSign) {
+      const c = this.add.container(318, 668)
+      const g = this.add.graphics()
+      // two posts
+      g.fillStyle(0x96683f, 1)
+      g.fillRoundedRect(-72, -6, 10, 34, 3)
+      g.fillRoundedRect(62, -6, 10, 34, 3)
+      // board
+      g.fillStyle(0xffffff, 1)
+      g.fillRoundedRect(-96, -56, 192, 50, 12)
+      g.lineStyle(4, 0x58cc02, 1)
+      g.strokeRoundedRect(-96, -56, 192, 50, 12)
+      const label = this.add
+        .text(0, -31, '', { fontFamily: FONT, fontSize: '20px', fontStyle: '900', color: '#3c3c3c' })
+        .setOrigin(0.5)
+      c.add([g, label])
+      this.welcomeLabel = label
+      this.welcomeSign = c
+    }
+    const text = `Welcome to ${cityName}`
+    if (this.welcomeLabel && this.welcomeLabel.text !== text) this.welcomeLabel.setText(text)
+  }
+
+  /** Redraw open buildings when their color/name changes. */
+  private renderLooks(payload: TownStatePayload) {
+    for (const def of PROJECTS) {
+      const p = payload.projects[def.id]
+      if (p?.status !== 'open' || def.id === 'road') continue
+      // nameSign already re-rendered via marker diff — nothing extra needed
+      void p
     }
   }
 }

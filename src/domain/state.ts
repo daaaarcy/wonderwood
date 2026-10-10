@@ -38,7 +38,7 @@ function initialChild(): ChildState {
 export function initialState(now: Date = new Date(), timeZone = 'UTC'): GameState {
   const at = now.toISOString()
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     timeZone,
     createdAt: at,
     config: structuredClone(DEFAULT_CHILD_CONFIG),
@@ -58,5 +58,8 @@ export function initialState(now: Date = new Date(), timeZone = 'UTC'): GameStat
     ],
     settings: { sound: true },
     city: initialCity(),
+    weekly: { theodore: {}, leonard: {} },
+    badges: [],
+    repairs: {},
   }
 }

@@ -140,7 +140,7 @@ test('founders bridge + opening celebration', async ({ browser }, testInfo) => {
     await page.goto('/')
     await page.getByRole('button', { name: 'Theodore' }).click()
     await expect(page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
-    await page.getByRole('button', { name: 'Buy & add one kit' }).click()
+    await page.getByRole('button', { name: 'Add a kit' }).click()
     await page.getByRole('button', { name: 'Yes, add it!' }).click()
     await expect(page.getByRole('dialog', { name: 'A building opened!' })).toBeVisible()
     await page.waitForTimeout(800) // let the pop animation settle
@@ -214,6 +214,10 @@ test('capture the quest v5 screens', async ({ browser }, testInfo) => {
   await shot(t.page, p, '30-home-theodore-core-bonus')
 
   // --- challenge with a hint shown ---
+  const bonusFold = t.page.locator('.bonus-fold')
+  if ((await bonusFold.count()) > 0 && (await bonusFold.getAttribute('open')) === null) {
+    await bonusFold.locator('summary').click()
+  }
   await t.page
     .locator('.quest-card', { hasText: "Builders' math" })
     .getByRole('button', { name: 'Start' })
@@ -294,7 +298,7 @@ test('capture the quest v5 screens', async ({ browser }, testInfo) => {
 
   const panel = l.page.locator('.panel', { hasText: 'Leonard’s quests' })
   await panel.locator('summary').click()
-  await expect(panel.locator('.weekday-grid')).toBeVisible()
+  await expect(panel.locator('.quest-day-rows')).toBeVisible()
   await shot(l.page, p, '37-schedule-editor')
 
   // pause today → rest day card
@@ -307,4 +311,148 @@ test('capture the quest v5 screens', async ({ browser }, testInfo) => {
   await expect(l.page.getByText('Rest day — enjoy!')).toBeVisible()
   await shot(l.page, p, '38-rest-day')
   await l.context.close()
+})
+
+test('capture the v6 screens', async ({ browser }, testInfo) => {
+  captureOnly(testInfo.project.name)
+  mkdirSync(DIR, { recursive: true })
+  const p = testInfo.project.name
+
+  const openTown = freshState((s) => {
+    for (const id of ['road', 'library', 'music-school', 'police-station', 'hospital'] as const) {
+      s.city.projects[id].status = 'open'
+      s.city.projects[id].openedAt = '2026-10-01T10:00:00Z'
+    }
+    s.city.currentProjectId = null
+    s.city.name = 'Sunny Meadow'
+    s.city.projects.library.color = '#9a6fe0'
+    s.city.projects.library.name = 'Rainbow Hall'
+    s.city.postcards = [
+      { id: 'postcard-road', projectId: 'road', openedAt: '2026-09-28T10:00:00Z' },
+      { id: 'postcard-library', projectId: 'library', openedAt: '2026-10-01T10:00:00Z' },
+    ]
+    s.claims['jr1'] = {
+      id: 'jr1', childId: 'leonard', questId: 'reading', activityDate: '2026-10-08',
+      role: 'core', status: 'approved', claimedAt: '2026-10-08T10:00:00Z',
+      reward: { coins: 10, stars: 1 },
+      details: { kind: 'reading', unit: 'book', title: 'Dragons Love Tacos', withGrownUp: false },
+    }
+    s.claims['jr2'] = {
+      id: 'jr2', childId: 'theodore', questId: 'reading', activityDate: '2026-10-09',
+      role: 'bonus', status: 'approved', claimedAt: '2026-10-09T10:00:00Z',
+      reward: { coins: 5, stars: 0 },
+      details: { kind: 'reading', unit: 'chapter', withGrownUp: false },
+    }
+    // a repaired incident for the acknowledgment card
+    s.repairs['inc-a'] = {
+      id: 'inc-a', childId: 'leonard', situation: 'scattering',
+      createdAt: '2026-10-10T10:00:00Z', repairedAt: '2026-10-10T12:00:00Z',
+    }
+  })
+
+  // --- town at every shape ---
+  const t = await seededPage(browser, p, seedJson(openTown))
+  await t.page.goto('/')
+  await t.page.getByRole('button', { name: 'Theodore' }).click()
+  await expect(t.page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
+  await t.page.waitForTimeout(800)
+  await shot(t.page, p, '40-town-fit')
+  await t.context.close()
+
+  // tablet portrait — a bespoke viewport for the portrait check
+  {
+    const context = await browser.newContext({ viewport: { width: 820, height: 1180 }, hasTouch: true })
+    await context.addInitScript((j) => {
+      if (!window.localStorage.getItem('wonderwood:v1')) window.localStorage.setItem('wonderwood:v1', j)
+    }, seedJson(openTown))
+    const page = await context.newPage()
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Theodore' }).click()
+    await expect(page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
+    await page.waitForTimeout(800)
+    await shot(page, `${p}-portrait`, '40-town-fit')
+    await context.close()
+  }
+
+  // --- each building's play view via canvas tap ---
+  const plot = async (page: Page, wx: number, wy: number) => {
+    const box = await page.locator('.island-wrap canvas').boundingBox()
+    const sc = Math.min(box!.width / 1000, box!.height / 700)
+    const offX = box!.x + (box!.width - 1000 * sc) / 2
+    const offY = box!.y + (box!.height - 700 * sc) / 2
+    await page.mouse.click(offX + wx * sc, offY + wy * sc)
+  }
+  const plays: [string, number, number, string][] = [
+    ['library', 225, 545, '41-play-library'],
+    ['music-school', 760, 560, '42-play-music'],
+    ['police-station', 340, 190, '43-play-police'],
+    ['hospital', 660, 185, '44-play-hospital'],
+  ]
+  for (const [, wx, wy, shotName] of plays) {
+    const s = await seededPage(browser, p, seedJson(openTown))
+    await s.page.goto('/')
+    await s.page.getByRole('button', { name: 'Leonard' }).click()
+    await expect(s.page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
+    await plot(s.page, wx, wy)
+    await s.page.getByRole('button', { name: 'Play!' }).click()
+    await s.page.waitForTimeout(500)
+    await shotOverlay(s.page, p, shotName)
+    await s.context.close()
+  }
+
+  // --- naming picker + customize + postcard album ---
+  {
+    const s = await seededPage(browser, p, seedJson(openTown))
+    await s.page.goto('/')
+    await s.page.getByRole('button', { name: 'Theodore' }).click()
+    await expect(s.page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
+    await s.page.getByRole('button', { name: /Sunny Meadow/ }).click()
+    await s.page.waitForTimeout(450)
+    await shotOverlay(s.page, p, '45-name-picker')
+    await s.page.getByRole('button', { name: 'Not now' }).click()
+    await s.page.waitForSelector('.sheet-backdrop', { state: 'detached' })
+    await s.page.waitForTimeout(200)
+
+    await plot(s.page, 225, 545)
+    await expect(s.page.getByRole('dialog', { name: /Library|Rainbow/ })).toBeVisible()
+    await s.page.getByRole('button', { name: 'Change colors' }).click()
+    await s.page.waitForTimeout(450)
+    await shotOverlay(s.page, p, '46-customize')
+    await s.page.getByRole('button', { name: 'Looks great!' }).click()
+
+    await s.page.getByRole('button', { name: 'My room' }).click()
+    await s.page.getByRole('button', { name: /My postcard album/ }).click()
+    await s.page.waitForTimeout(450)
+    await shotOverlay(s.page, p, '47-postcards')
+    await s.context.close()
+  }
+
+  // --- Leonard home: weekly card + repair acknowledgment + journal already covered ---
+  {
+    const s = await seededPage(browser, p, seedJson(openTown))
+    await s.page.goto('/')
+    await s.page.getByRole('button', { name: 'Leonard' }).click()
+    await expect(s.page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
+    await s.page.waitForTimeout(400)
+    await shot(s.page, p, '48-home-weekly-repair')
+    await s.context.close()
+  }
+
+  // --- grown-ups: schedule editor + reset & repair ---
+  {
+    const s = await seededPage(browser, p, seedJson(openTown))
+    await s.page.goto('/')
+    await s.page.getByRole('button', { name: 'Grown-ups' }).click()
+    await s.page.waitForSelector('.pin-key')
+    for (const d of '1234') await s.page.getByRole('button', { name: `Digit ${d}` }).click()
+    const conf = s.page.getByText('Tap the same PIN again')
+    if (await conf.isVisible().catch(() => false)) {
+      for (const d of '1234') await s.page.getByRole('button', { name: `Digit ${d}` }).click()
+    }
+    const panel = s.page.locator('.panel', { hasText: 'Leonard’s quests' })
+    await panel.locator('summary').click()
+    await s.page.locator('.repairs-panel').scrollIntoViewIfNeeded()
+    await shot(s.page, p, '49-grownups-schedule-repairs')
+    await s.context.close()
+  }
 })

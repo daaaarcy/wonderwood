@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { projectView, todayQuestsFor } from '../../domain/selectors'
+import {
+  projectView,
+  todayQuestsFor,
+  unacknowledgedRepairs,
+  weeklyView,
+} from '../../domain/selectors'
+import { localDateKey, mondayKeyOf } from '../../domain/week'
+import { weeklyTemplateById } from '../../data/weekly'
 import type { ChildId, ProjectId } from '../../domain/types'
 import { CHILDREN } from '../../data/children'
 import { itemById } from '../../data/catalogue'
@@ -15,6 +22,9 @@ import { ChallengeModal } from '../challenges/ChallengeModal'
 import { Celebration, type CelebrationData } from '../components/Celebration'
 import { ReadingJournal } from '../components/ReadingJournal'
 import { PromotionOverlay } from '../components/PromotionOverlay'
+import { PlayView } from '../play/PlayView'
+import { PostcardAlbum } from '../components/Postcard'
+import { CustomizeSheet, NameCitySheet } from '../components/Personalize'
 
 /** Per-device record of building openings already celebrated. */
 const OPENINGS_KEY = 'wonderwood:seen-openings'
@@ -46,6 +56,10 @@ type Sheet =
   | { kind: 'housework' }
   | { kind: 'journal' }
   | { kind: 'challenge'; quest: QuestDef }
+  | { kind: 'play'; projectId: ProjectId }
+  | { kind: 'customize'; projectId: ProjectId }
+  | { kind: 'name-city' }
+  | { kind: 'album' }
 
 export function ChildHome({ childId }: { childId: ChildId }) {
   const state = useGameState()
@@ -57,6 +71,7 @@ export function ChildHome({ childId }: { childId: ChildId }) {
   const [sceneReady, setSceneReady] = useState(false)
   const [celebration, setCelebration] = useState<CelebrationData | null>(null)
   const [opening, setOpening] = useState<ProjectId | null>(null)
+  const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 640
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const sheetRef = useRef<Sheet | null>(null)
   useEffect(() => {
@@ -70,6 +85,8 @@ export function ChildHome({ childId }: { childId: ChildId }) {
   }
   const [busy, setBusy] = useState(false)
   const prev = useRef<{ childId: ChildId; coins: number; stars: number } | null>(null)
+  const prevBadges = useRef<number | null>(null)
+  const [badgeCelebration, setBadgeCelebration] = useState<string | null>(null)
   const prevOpenings = useRef<Set<string> | null>(null)
 
   const city = state.city
@@ -121,6 +138,20 @@ export function ChildHome({ childId }: { childId: ChildId }) {
     }
   }, [city])
 
+  // A freshly-earned weekly badge gets a small celebration.
+  useEffect(() => {
+    const n = state.badges.filter((b) => b.childId === childId).length
+    if (prevBadges.current === null) {
+      prevBadges.current = n
+      return
+    }
+    if (n > prevBadges.current) {
+      const badge = state.badges.filter((b) => b.childId === childId).at(-1)
+      setBadgeCelebration(badge ? (weeklyTemplateById(badge.templateId)?.title ?? 'Weekly challenge') : 'Weekly challenge')
+    }
+    prevBadges.current = n
+  }, [state.badges, childId])
+
   // Push world state into the town scene once it is listening.
   useEffect(() => {
     if (!sceneReady) return
@@ -135,6 +166,13 @@ export function ChildHome({ childId }: { childId: ChildId }) {
         leonard: state.children.leonard.equipped.hat,
       },
       foundersPlanks: city.foundersBridgePlanks,
+      cityName: city.name ?? null,
+      looks: Object.fromEntries(
+        PROJECTS.map((p) => [
+          p.id,
+          { color: city.projects[p.id].color ?? null, name: city.projects[p.id].name ?? null },
+        ]),
+      ) as Record<ProjectId, { color: string | null; name: string | null }>,
     })
   }, [state, sceneReady, city])
 
@@ -146,14 +184,20 @@ export function ChildHome({ childId }: { childId: ChildId }) {
       if (sheetRef.current) return
       if (e.kind === 'plot' && e.projectId) setSheet({ kind: 'plot', projectId: e.projectId })
       if (e.kind === 'bridge' && e.planks) setSheet({ kind: 'bridge', planks: e.planks })
+      if (e.kind === 'truck') EventBus.emit('town-ride', childId)
     }
     EventBus.on('town-tap', onTap)
     return () => {
       EventBus.off('town-tap', onTap)
     }
-  }, [])
+  }, [childId])
 
   const wish = child.wishItem ? itemById(child.wishItem) : undefined
+  const weekKey = mondayKeyOf(localDateKey(new Date(), state.timeZone))
+  const weekly = weeklyView(state, childId, weekKey)
+  const badgeForWeek = state.badges.find((b) => b.childId === childId && b.weekKey === weekKey)
+  const weeklyTemplate = weekly ? weeklyTemplateById(weekly.templateId) : undefined
+  const pendingRepair = unacknowledgedRepairs(state, childId)[0]
   const promotion = child.league.unseenPromotion
   const current = city.currentProjectId ? projectById(city.currentProjectId) : undefined
   const currentView = city.currentProjectId ? projectView(state, city.currentProjectId) : undefined
@@ -185,6 +229,9 @@ export function ChildHome({ childId }: { childId: ChildId }) {
       <div className="home-main">
         <div className="island-wrap">
           <PhaserGame scene="town" onSceneReady={setSceneReady} />
+          <button className="town-name-tag" onClick={() => setSheet({ kind: 'name-city' })}>
+            {city.name ? `🏡 ${city.name}` : '🏡 Name our town'}
+          </button>
         </div>
 
         <div className="home-side">
@@ -229,9 +276,13 @@ export function ChildHome({ childId }: { childId: ChildId }) {
                 disabled={!canAffordKit || busy || offline}
                 onClick={() => setSheet({ kind: 'buy-kit' })}
               >
-                {canAffordKit
-                  ? `Buy & add one kit — ${KIT_PRICE} coins`
-                  : `Need ${KIT_PRICE - child.coins} more coin${KIT_PRICE - child.coins === 1 ? '' : 's'}`}
+                {canAffordKit ? (
+                  <>
+                    Add a kit <img src={assetUrl('coin')} alt="" className="btn-coin" /> {KIT_PRICE}
+                  </>
+                ) : (
+                  `Need ${KIT_PRICE - child.coins} more coin${KIT_PRICE - child.coins === 1 ? '' : 's'}`
+                )}
               </button>
             </section>
           ) : (
@@ -261,6 +312,34 @@ export function ChildHome({ childId }: { childId: ChildId }) {
                 {child.coins}/{wish.price}
               </span>
             </div>
+          )}
+
+          {pendingRepair && (
+            <article className="quest-card repair-card" data-testid="repair-ack">
+              <p className="quest-label">Thanks for making it right, {CHILDREN[childId].name}!</p>
+              <button
+                className="btn btn-yes"
+                onClick={() => void repo.dispatch({ type: 'acknowledgeRepair', incidentId: pendingRepair.id })}
+              >
+                Okay!
+              </button>
+            </article>
+          )}
+
+          {weekly && weeklyTemplate && (
+            <article className="quest-card weekly-card" data-testid="weekly-card">
+              <div className="quest-text">
+                <p className="quest-label">This week: {weekly.title}</p>
+                <p className="quest-sub">
+                  {weekly.completedAt
+                    ? `Done! +20 coins — badge earned!`
+                    : `${'●'.repeat(weekly.done)}${'○'.repeat(weekly.days - weekly.done)} ${weekly.done} of ${weekly.days} days`}
+                </p>
+              </div>
+              <span className="weekly-badge" aria-hidden="true">
+                {badgeForWeek ? '🏅' : '✨'}
+              </span>
+            </article>
           )}
 
           <section className="quest-panel" aria-label="Today's quests">
@@ -302,38 +381,40 @@ export function ChildHome({ childId }: { childId: ChildId }) {
                 })}
 
                 {today.bonus.length > 0 && (
-                  <div className="bonus-head">
-                    <span className="bonus-title">Bonus</span>
-                    <span className="bonus-pips" aria-label={`${today.bonusSlotsLeft} bonus coins left today`}>
-                      {today.bonusSlotsLeft > 0
-                        ? `Bonus coins left today: ${'●'.repeat(today.bonusSlotsLeft)}${'○'.repeat(2 - today.bonusSlotsLeft)}`
-                        : 'Bonus coins are full today — amazing effort!'}
-                    </span>
-                  </div>
+                  <details className="bonus-fold" open={!isSmallScreen}>
+                    <summary className="bonus-head">
+                      <span className="bonus-title">Bonus</span>
+                      <span className="bonus-pips" aria-label={`${today.bonusSlotsLeft} bonus coins left today`}>
+                        {today.bonusSlotsLeft > 0
+                          ? `Bonus coins left today: ${'●'.repeat(today.bonusSlotsLeft)}${'○'.repeat(2 - today.bonusSlotsLeft)}`
+                          : 'Bonus coins are full today — amazing effort!'}
+                      </span>
+                    </summary>
+                    {today.bonus.map((t) => {
+                      const quest = questById(t.questId)
+                      if (!quest) return null
+                      return (
+                        <QuestCard
+                          key={quest.id}
+                          quest={quest}
+                          status={t.status}
+                          childId={childId}
+                          offline={offline}
+                          openSheet={setSheet}
+                          claimQuest={(details) =>
+                            void repo.dispatch({
+                              type: 'claimQuest',
+                              childId,
+                              questId: quest.id,
+                              claimId: crypto.randomUUID(),
+                              details,
+                            })
+                          }
+                        />
+                      )
+                    })}
+                  </details>
                 )}
-                {today.bonus.map((t) => {
-                  const quest = questById(t.questId)
-                  if (!quest) return null
-                  return (
-                    <QuestCard
-                      key={quest.id}
-                      quest={quest}
-                      status={t.status}
-                      childId={childId}
-                      offline={offline}
-                      openSheet={setSheet}
-                      claimQuest={(details) =>
-                        void repo.dispatch({
-                          type: 'claimQuest',
-                          childId,
-                          questId: quest.id,
-                          claimId: crypto.randomUUID(),
-                          details,
-                        })
-                      }
-                    />
-                  )
-                })}
 
                 {(today.readingClaims.length > 0 ||
                   today.core.some((t) => t.questId === 'reading')) && (
@@ -384,6 +465,33 @@ export function ChildHome({ childId }: { childId: ChildId }) {
                   ? `${sheetView.kits} of ${sheetView.required} kits so far`
                   : `Needs ${sheetView.required} kits to build`}
             </p>
+            {sheetView.status === 'open' && sheet.projectId === 'road' && (
+              <button
+                className="btn btn-yes"
+                onClick={() => {
+                  EventBus.emit('town-ride', childId)
+                  closeSheet()
+                }}
+              >
+                Ride along!
+              </button>
+            )}
+            {sheetView.status === 'open' && sheet.projectId !== 'road' && (
+              <button
+                className="btn btn-yes"
+                onClick={() => setSheet({ kind: 'play', projectId: sheet.projectId })}
+              >
+                Play!
+              </button>
+            )}
+            {sheetView.status === 'open' && (
+              <button
+                className="btn"
+                onClick={() => setSheet({ kind: 'customize', projectId: sheet.projectId })}
+              >
+                Change colors
+              </button>
+            )}
             {sheetView.status === 'locked' && city.currentProjectId === null && (
               <button
                 className="btn"
@@ -464,6 +572,50 @@ export function ChildHome({ childId }: { childId: ChildId }) {
         </div>
       )}
 
+      {sheet?.kind === 'customize' && sheet && (
+        <CustomizeSheet
+          state={state}
+          projectId={sheet.projectId}
+          onDone={(color, name) => {
+            void repo.dispatch({
+              type: 'customizeBuilding',
+              childId,
+              projectId: sheet.projectId,
+              color,
+              name,
+            })
+            closeSheet()
+          }}
+        />
+      )}
+
+      {sheet?.kind === 'album' && (
+        <div className="sheet-backdrop" onClick={closeSheet}>
+          <div className="sheet" role="dialog" aria-label="Postcard album" onClick={(e) => e.stopPropagation()}>
+            <p className="sheet-title">Our postcards</p>
+            <PostcardAlbum state={state} />
+            <button className="btn btn-neutral" onClick={closeSheet}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sheet?.kind === 'name-city' && (
+        <NameCitySheet
+          current={city.name ?? null}
+          onDone={(name) => {
+            void repo.dispatch({ type: 'nameCity', childId, name })
+            closeSheet()
+          }}
+          onCancel={closeSheet}
+        />
+      )}
+
+      {sheet?.kind === 'play' && (
+        <PlayView projectId={sheet.projectId} state={state} childId={childId} onClose={closeSheet} />
+      )}
+
       {sheet?.kind === 'journal' && (
         <div className="sheet-backdrop" onClick={closeSheet}>
           <div className="sheet journal-sheet" role="dialog" aria-label="Reading journal" onClick={(e) => e.stopPropagation()}>
@@ -501,6 +653,19 @@ export function ChildHome({ childId }: { childId: ChildId }) {
         />
       )}
 
+      {/* weekly badge celebration */}
+      {badgeCelebration && (
+        <div className="celebration" role="dialog" aria-label="Weekly challenge complete!">
+          <div className="celebration-card">
+            <p className="celebration-text">🏅 {badgeCelebration} — done!</p>
+            <p className="celebration-sub">+20 coins and a new badge!</p>
+            <button className="btn btn-yes" onClick={() => setBadgeCelebration(null)}>
+              Hooray!
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* opening-day celebration */}
       {opening && (
         <div className="celebration" role="dialog" aria-label="A building opened!">
@@ -526,6 +691,18 @@ export function ChildHome({ childId }: { childId: ChildId }) {
             </div>
             <p className="celebration-text">The {projectById(opening)?.label} is open!</p>
             <p className="celebration-sub">The whole town says thank you!</p>
+            <button
+              className="btn btn-yes"
+              onClick={() => {
+                if (opening) {
+                  markOpeningSeen(`${opening}:${city.projects[opening].openedAt}`)
+                  setOpening(null)
+                  setSheet({ kind: 'customize', projectId: opening })
+                }
+              }}
+            >
+              Make it yours
+            </button>
             <button
               className="btn btn-big btn-yes"
               onClick={() => {

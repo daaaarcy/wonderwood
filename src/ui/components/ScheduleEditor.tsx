@@ -3,6 +3,9 @@ import { localDateKey } from '../../domain/week'
 import { scheduleForDate } from '../../domain/migrate'
 import type { ChildId, DaySchedule } from '../../domain/types'
 import { QUESTS } from '../../data/quests'
+import { WEEKLY_TEMPLATES, weeklyTemplateById } from '../../data/weekly'
+import { eligibleWeeklyTemplates, weeklyTemplateFor } from '../../domain/commands'
+import { mondayKeyOf } from '../../domain/week'
 import { useGameState, useRepository } from '../../storage/hooks'
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -26,6 +29,9 @@ export function ScheduleEditor({ childId, pin }: { childId: ChildId; pin: string
   const [config, setConfig] = useState(() => ({ ...state.config[childId] }))
   const [paused, setPaused] = useState<string[]>(() => [...state.pausedDates[childId]])
   const [newJob, setNewJob] = useState('')
+  const [weeklyId, setWeeklyId] = useState(() =>
+    weeklyTemplateFor(state, childId, mondayKeyOf(today)),
+  )
   const [newPauseDate, setNewPauseDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -58,6 +64,12 @@ export function ScheduleEditor({ childId, pin }: { childId: ChildId; pin: string
         { type: 'updateChildConfig', childId, patch: config },
         { pin: pin ?? undefined },
       )
+      if (weeklyId !== weeklyTemplateFor(state, childId, mondayKeyOf(today))) {
+        await repo.dispatch(
+          { type: 'setWeeklyChallenge', childId, weekKey: mondayKeyOf(today), templateId: weeklyId },
+          { pin: pin ?? undefined },
+        )
+      }
       // pause diffs
       const before = new Set(state.pausedDates[childId])
       const after = new Set(paused)
@@ -82,23 +94,32 @@ export function ScheduleEditor({ childId, pin }: { childId: ChildId; pin: string
   return (
     <div className="schedule-editor">
       <h4>Core quests (up to 3 a day)</h4>
-      <div className="weekday-grid">
-        {WEEKDAYS.map((name, d) => (
-          <div key={d} className="weekday-col">
-            <span className="weekday-name">{name}</span>
-            {quests.map((q) => (
-              <label key={q.id} className={`sched-check ${(core[d] ?? []).includes(q.id) ? 'on' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={(core[d] ?? []).includes(q.id)}
-                  onChange={() => toggleCore(d, q.id)}
-                  disabled={
-                    !(core[d] ?? []).includes(q.id) &&
-                    ((core[d] ?? []).length >= 3 || bonus.includes(q.id))
-                  }
-                />
-                {q.label}
-              </label>
+      <div className="quest-day-rows">
+        <div className="quest-day-head">
+          <span className="quest-day-name" />
+          {WEEKDAYS.map((name) => (
+            <span key={name} className="weekday-name">
+              {name}
+            </span>
+          ))}
+        </div>
+        {quests.map((q) => (
+          <div key={q.id} className="quest-day-row">
+            <span className="quest-day-name">{q.label}</span>
+            {WEEKDAYS.map((_, d) => (
+              <button
+                key={d}
+                className={`day-dot ${(core[d] ?? []).includes(q.id) ? 'on' : ''}`}
+                onClick={() => toggleCore(d, q.id)}
+                disabled={
+                  !(core[d] ?? []).includes(q.id) &&
+                  ((core[d] ?? []).length >= 3 || bonus.includes(q.id))
+                }
+                aria-label={`${q.label} on ${WEEKDAYS[d]}`}
+                aria-pressed={(core[d] ?? []).includes(q.id)}
+              >
+                {(core[d] ?? []).includes(q.id) ? '✓' : ''}
+              </button>
             ))}
           </div>
         ))}
@@ -166,6 +187,25 @@ export function ScheduleEditor({ childId, pin }: { childId: ChildId; pin: string
             ))}
         </ul>
       )}
+
+      <h4>This week&rsquo;s challenge</h4>
+      <div className="form-field">
+        <span>Weekly challenge (+20 coins and a badge)</span>
+        <select
+          className="form-input"
+          value={weeklyId}
+          onChange={(e) => setWeeklyId(e.target.value)}
+        >
+          {WEEKLY_TEMPLATES.filter((t) => eligibleWeeklyTemplates(state, childId).includes(t.id)).map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.title}
+            </option>
+          ))}
+        </select>
+        {weeklyTemplateById(weeklyId) && (
+          <span className="muted">Needs approved activities on {weeklyTemplateById(weeklyId)?.days} different days.</span>
+        )}
+      </div>
 
       <h4>Settings for {childId === 'theodore' ? 'Theodore' : 'Leonard'}</h4>
       <label className="form-field">

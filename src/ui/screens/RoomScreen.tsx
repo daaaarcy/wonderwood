@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { PostcardAlbum } from '../components/Postcard'
 import type { ChildId } from '../../domain/types'
 import { CHILDREN } from '../../data/children'
 import { assetUrl } from '../../game/assets'
@@ -13,6 +14,7 @@ export function RoomScreen({ childId }: { childId: ChildId }) {
   const def = CHILDREN[childId]
   const [sceneReady, setSceneReady] = useState(false)
   const [trainRunning, setTrainRunning] = useState(false)
+  const [album, setAlbum] = useState(false)
 
   useEffect(() => {
     const handler = (payload: { running: boolean }) => setTrainRunning(payload.running)
@@ -47,6 +49,22 @@ export function RoomScreen({ childId }: { childId: ChildId }) {
       <p className="sr-only" data-testid="train-state">
         {trainRunning ? 'running' : 'stopped'}
       </p>
+
+      <button
+        className="btn btn-neutral album-btn"
+        onClick={() => setAlbum(true)}
+      >
+        My postcard album {(state.city.postcards ?? []).length > 0 ? `(${(state.city.postcards ?? []).length})` : ''}
+      </button>
+      {album && (
+        <div className="sheet-backdrop" onClick={() => setAlbum(false)}>
+          <div className="sheet" role="dialog" aria-label="Postcard album" onClick={(e) => e.stopPropagation()}>
+            <p className="sheet-title">Our postcards</p>
+            <PostcardAlbum state={state} />
+            <button className="btn btn-neutral" onClick={() => setAlbum(false)}>Close</button>
+          </div>
+        </div>
+      )}
 
       <div className="room-controls">
         {ownsHat ? (

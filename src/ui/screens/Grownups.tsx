@@ -6,6 +6,7 @@ import type { Claim } from '../../domain/types'
 import { CHILD_LIST } from '../../data/children'
 import { questById } from '../../data/quests'
 import { ScheduleEditor } from '../components/ScheduleEditor'
+import { RepairsPanel } from '../components/RepairsPanel'
 import { assetUrl } from '../../game/assets'
 import { useGameState, useRepository } from '../../storage/hooks'
 import { LeagueBadge } from '../components/LeagueBadge'
@@ -316,6 +317,8 @@ export function Grownups({ onExit }: { onExit: () => void }) {
           </section>
         )
       })}
+
+      <RepairsPanel pin={unlockedPin} />
 
       <button className="btn btn-ghost" onClick={onExit}>
         Done — back to explorers

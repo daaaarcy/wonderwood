@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { leagueWeekStatus } from '../../domain/selectors'
+import { badgesFor, leagueWeekStatus } from '../../domain/selectors'
+import { weeklyTemplateById } from '../../data/weekly'
 import type { ChildId } from '../../domain/types'
 import { CHILDREN, CHILD_LIST } from '../../data/children'
 import { LEAGUES, leagueTitle } from '../../data/leagues'
@@ -68,6 +69,23 @@ export function LeagueScreen({ childId }: { childId: ChildId }) {
             )
           })}
         </ol>
+      </section>
+
+      <section className="panel" aria-label="My badges">
+        <h3>My badges</h3>
+        {badgesFor(state, childId).length === 0 ? (
+          <p className="muted">Weekly challenge badges will live here!</p>
+        ) : (
+          <ul className="badge-list">
+            {badgesFor(state, childId).map((b) => (
+              <li key={b.id} className="badge-row">
+                <span className="badge-medal" aria-hidden="true">🏅</span>
+                <span className="badge-title">{weeklyTemplateById(b.templateId)?.title ?? 'Weekly challenge'}</span>
+                <span className="muted">{new Date(b.earnedAt).toLocaleDateString()}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <p className="muted league-sibling">

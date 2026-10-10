@@ -57,7 +57,7 @@ test('city loop: two claims → approvals → kits → road opens → library cu
   await pickExplorer(page, 'Theodore')
   await dismissCelebration(page)
   await expect(page.getByTestId('coin-count')).toHaveText('30')
-  await page.getByRole('button', { name: 'Buy & add one kit' }).click()
+  await page.getByRole('button', { name: 'Add a kit' }).click()
   await page.getByRole('dialog', { name: 'Buy a building kit' }).getByRole('button', { name: 'Yes, add it!' }).click()
   await expect(page.getByTestId('project-road')).toHaveText('Road: 1 of 2 kits')
   await expect(page.getByTestId('coin-count')).toHaveText('20')
@@ -65,7 +65,7 @@ test('city loop: two claims → approvals → kits → road opens → library cu
   // Leonard buys the second kit → road opens, celebration shows, library current
   await switchExplorer(page)
   await pickExplorer(page, 'Leonard')
-  await page.getByRole('button', { name: 'Buy & add one kit' }).click()
+  await page.getByRole('button', { name: 'Add a kit' }).click()
   await page.getByRole('button', { name: 'Yes, add it!' }).click()
   await expect(page.getByRole('dialog', { name: 'A building opened!' })).toBeVisible()
   await expect(page.getByText('The Road is open!')).toBeVisible()

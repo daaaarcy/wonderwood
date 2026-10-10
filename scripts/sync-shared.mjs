@@ -13,12 +13,13 @@ const FILES = [
   'week.ts',
   'migrate.ts',
   'challenge.ts',
+  'weekly.ts',
   'commands.ts',
   'quests.ts',
   'catalogue.ts',
   'city.ts',
 ]
-const SRC = { 'types.ts': 'src/domain', 'state.ts': 'src/domain', 'week.ts': 'src/domain', 'commands.ts': 'src/domain', 'migrate.ts': 'src/domain', 'challenge.ts': 'src/domain',
+const SRC = { 'types.ts': 'src/domain', 'state.ts': 'src/domain', 'week.ts': 'src/domain', 'commands.ts': 'src/domain', 'migrate.ts': 'src/domain', 'challenge.ts': 'src/domain', 'weekly.ts': 'src/data',
               'quests.ts': 'src/data', 'catalogue.ts': 'src/data', 'city.ts': 'src/data' }
 const OUT = 'supabase/functions/_shared'
 

@@ -291,7 +291,52 @@ describe('v5: grown-up commands + migration on load', () => {
     expect((claim.json as { result: { ok: boolean } }).result.ok).toBe(true)
     // the persisted doc is migrated v5
     const stored = store.households.get(hid)!.state
-    expect(stored.schemaVersion).toBe(5)
+    expect(stored.schemaVersion).toBe(6)
     expect(stored.scheduleHistory.length).toBeGreaterThan(0)
+  })
+})
+
+describe('v6: grown-up commands require PIN, child commands do not', () => {
+  it('setWeeklyChallenge/logIncident/markRepaired/deleteIncident need PIN', async () => {
+    const store = new FakeStore()
+    const hid = await store.seed()
+    await store.setPin(hid, '1234')
+    const week = '2026-10-12'
+    for (const command of [
+      { type: 'setWeeklyChallenge', childId: 'leonard', weekKey: week, templateId: 'read-4' },
+      { type: 'logIncident', childId: 'theodore', incidentId: 'i1', situation: 'scattering' },
+      { type: 'markRepaired', incidentId: 'i1' },
+      { type: 'deleteIncident', incidentId: 'i1' },
+    ]) {
+      const noPin = await call(store, GROWN, 'command', { householdId: hid, command })
+      expect(noPin.status, JSON.stringify(command)).toBe(403)
+      const withPin = await call(store, GROWN, 'command', { householdId: hid, pin: '1234', command })
+      expect(withPin.status, JSON.stringify(command)).toBe(200)
+    }
+  })
+
+  it('nameCity/customizeBuilding/acknowledgeRepair are child-allowed', async () => {
+    const store = new FakeStore()
+    const hid = await store.seed()
+    await store.addMember(hid, KID.userId, 'device', 'tablet')
+    await store.setPin(hid, '1234')
+    const name = await call(store, KID, 'command', {
+      householdId: hid, command: { type: 'nameCity', childId: 'theodore', name: 'Sunny Town' },
+    })
+    expect(name.status).toBe(200)
+    expect((name.json as { result: { ok: boolean } }).result.ok).toBe(true)
+    // ack: log + repair via grown-up, then child acks without PIN
+    await call(store, GROWN, 'command', {
+      householdId: hid, pin: '1234',
+      command: { type: 'logIncident', childId: 'leonard', incidentId: 'i9', situation: 'fighting' },
+    })
+    await call(store, GROWN, 'command', {
+      householdId: hid, pin: '1234', command: { type: 'markRepaired', incidentId: 'i9' },
+    })
+    const ack = await call(store, KID, 'command', {
+      householdId: hid, command: { type: 'acknowledgeRepair', incidentId: 'i9' },
+    })
+    expect(ack.status).toBe(200)
+    expect((ack.json as { result: { ok: boolean } }).result.ok).toBe(true)
   })
 })

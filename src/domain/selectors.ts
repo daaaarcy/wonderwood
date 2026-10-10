@@ -1,7 +1,9 @@
 import { addDaysKey, localDateKey, mondayKeyOf, weekdayOf } from './week.ts'
 import { scheduleForDate } from './migrate.ts'
 import { projectById } from '../data/city.ts'
-import type { ChildId, Claim, GameState, ProjectId } from './types.ts'
+import { weeklyDaysCount } from './commands.ts'
+import { DEFAULT_WEEKLY, weeklyTemplateById } from '../data/weekly.ts'
+import type { ChildId, Claim, GameState, ProjectId, RepairIncident, WeeklyBadge } from './types.ts'
 import { BONUS_SLOTS_PER_DAY } from './types.ts'
 
 export type QuestStatus = 'available' | 'pending' | 'done'
@@ -202,4 +204,45 @@ export function leagueWeekStatus(state: GameState, childId: ChildId, now: Date):
   const restWeek = days < 3
   const target = restWeek ? null : Math.ceil(0.7 * opportunities)
   return { count, activeDays, eligibleDays: days, opportunities, target, restWeek }
+}
+
+/* ---------------- weekly challenge + repairs (v6) ---------------- */
+
+export interface WeeklyView {
+  templateId: string
+  title: string
+  days: number
+  done: number
+  completedAt?: string
+}
+
+/** This week's challenge card for a child (default template if unchosen). */
+export function weeklyView(
+  state: GameState,
+  childId: ChildId,
+  weekKey: string,
+): WeeklyView | null {
+  const entry = state.weekly[childId]?.[weekKey]
+  const templateId = entry?.templateId ?? DEFAULT_WEEKLY[childId]
+  const template = weeklyTemplateById(templateId)
+  if (!template) return null
+  return {
+    templateId,
+    title: template.title,
+    days: template.days,
+    done: Math.min(template.days, weeklyDaysCount(state, childId, weekKey, template.questIds)),
+    completedAt: entry?.completedAt,
+  }
+}
+
+/** Badges earned by a child, newest first. */
+export function badgesFor(state: GameState, childId: ChildId): WeeklyBadge[] {
+  return state.badges.filter((b) => b.childId === childId).sort((a, b) => b.earnedAt.localeCompare(a.earnedAt))
+}
+
+/** Repaired incidents this child hasn't acknowledged yet (shown once). */
+export function unacknowledgedRepairs(state: GameState, childId: ChildId): RepairIncident[] {
+  return Object.values(state.repairs).filter(
+    (r) => r.childId === childId && r.repairedAt && !r.acknowledgedAt,
+  )
 }

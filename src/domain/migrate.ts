@@ -22,7 +22,15 @@ import {
 /** v2 shape: v3 minus the city block (v2 still had parentPinHash). */
 type GameStateV2 = Omit<
   GameState,
-  'schemaVersion' | 'city' | 'timeZone' | 'config' | 'scheduleHistory' | 'pausedDates'
+  | 'schemaVersion'
+  | 'city'
+  | 'timeZone'
+  | 'config'
+  | 'scheduleHistory'
+  | 'pausedDates'
+  | 'weekly'
+  | 'badges'
+  | 'repairs'
 > & {
   schemaVersion: 2
   parentPinHash?: string | null
@@ -37,6 +45,10 @@ type GameStateV3 = Omit<GameStateV2, 'schemaVersion'> & {
 type GameStateV4 = Omit<GameStateV3, 'schemaVersion'> & {
   schemaVersion: 4
   timeZone: string
+}
+
+type GameStateV5 = Omit<GameState, 'schemaVersion' | 'weekly' | 'badges' | 'repairs'> & {
+  schemaVersion: 5
 }
 
 /* ---------------- validators ---------------- */
@@ -92,6 +104,12 @@ function isValidV5(value: Record<string, unknown>): boolean {
   if (!isValidV4(value)) return false
   const s = value as unknown as GameState
   return isRecord(s.config) && Array.isArray(s.scheduleHistory) && isRecord(s.pausedDates)
+}
+
+function isValidV6(value: Record<string, unknown>): boolean {
+  if (!isValidV5(value)) return false
+  const s = value as unknown as GameState
+  return isRecord(s.weekly) && Array.isArray(s.badges) && isRecord(s.repairs)
 }
 
 /* ---------------- chain ---------------- */
@@ -167,8 +185,25 @@ export const DEFAULT_CHILD_CONFIG: Record<ChildId, ChildConfig> = {
   },
 }
 
+/** v5 → v6: city naming/postcards, weekly challenges, repair log. */
+function migrateV5(v5: GameStateV5): GameState {
+  return {
+    ...v5,
+    schemaVersion: 6,
+    city: {
+      ...v5.city,
+      name: v5.city.name ?? null,
+      postcards: v5.city.postcards ?? [],
+      projects: { ...v5.city.projects },
+    },
+    weekly: { theodore: {}, leonard: {} },
+    badges: [],
+    repairs: {},
+  }
+}
+
 /** v4 → v5: schedules, per-child config, rest days; claims get role/reward stamps. */
-function migrateV4(v4: GameStateV4, ctx: { now: Date; timeZone: string }): GameState {
+function migrateV4(v4: GameStateV4, ctx: { now: Date; timeZone: string }): GameStateV5 {
   const createdKey = localDateKey(new Date(v4.createdAt), v4.timeZone)
   const todayKey = localDateKey(ctx.now, ctx.timeZone)
   const claims: Record<string, Claim> = {}
@@ -212,16 +247,20 @@ export function migrateState(raw: unknown, ctx: MigrateCtx): GameState | null {
     } else if (version === 2) {
       v2 = isValidV2(value) ? (value as unknown as GameStateV2) : null
     }
-    if (v2) return migrateV4(migrateV3(migrateV2(v2), ctx.timeZone), ctx)
+    if (v2) return migrateV5(migrateV4(migrateV3(migrateV2(v2), ctx.timeZone), ctx))
     if (version === 3) {
       const v3 = isValidV3(value) ? (value as unknown as GameStateV3) : null
-      return v3 ? migrateV4(migrateV3(v3, ctx.timeZone), ctx) : null
+      return v3 ? migrateV5(migrateV4(migrateV3(v3, ctx.timeZone), ctx)) : null
     }
     if (version === 4) {
       const v4 = isValidV4(value) ? (value as unknown as GameStateV4) : null
-      return v4 ? migrateV4(v4, ctx) : null
+      return v4 ? migrateV5(migrateV4(v4, ctx)) : null
     }
-    if (version === 5) return isValidV5(value) ? (value as unknown as GameState) : null
+    if (version === 5) {
+      const v5 = isValidV5(value) ? (value as unknown as GameStateV5) : null
+      return v5 ? migrateV5(v5) : null
+    }
+    if (version === 6) return isValidV6(value) ? (value as unknown as GameState) : null
     return null
   } catch {
     return null

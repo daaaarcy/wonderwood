@@ -12,7 +12,7 @@ export type ClaimDetails =
   | { kind: 'reading'; unit: 'book' | 'chapter'; title?: string; withGrownUp: boolean }
   | { kind: 'challenge'; hintsUsed: number; correctFirstTry: number }
   | { kind: 'housework'; job: string }
-export type LedgerReason = 'welcome' | 'quest' | 'purchase' | 'kit'
+export type LedgerReason = 'welcome' | 'quest' | 'purchase' | 'kit' | 'weekly'
 
 export interface LedgerEntry {
   id: string
@@ -77,6 +77,9 @@ export interface CityProjectState {
   kits: number
   status: ProjectStatus
   openedAt?: string
+  /** v6: personalization chosen at/before opening day. */
+  color?: string
+  name?: string
 }
 
 export interface CityState {
@@ -90,6 +93,17 @@ export interface CityState {
   >
   /** Keepsake from the island era — frozen at migration, never spent. */
   foundersBridgePlanks: number
+  /** v6: the town's name, picked by the kids (null until named). */
+  name?: string | null
+  /** v6: collectible postcards — one per building that opened. */
+  postcards?: Postcard[]
+}
+
+/** v6: a collectible stamped when a building opens. */
+export interface Postcard {
+  id: string
+  projectId: ProjectId
+  openedAt: string
 }
 
 export interface ChildConfig {
@@ -99,6 +113,43 @@ export interface ChildConfig {
   houseworkJobs: string[]
 }
 
+/* ---------------- weekly challenge ---------------- */
+
+/** v6: one challenge per child per week (distinct approved days). */
+export interface WeeklyEntry {
+  templateId: string
+  completedAt?: string
+}
+
+/** v6: earned weekly badge (20 coins on completion, never stars). */
+export interface WeeklyBadge {
+  id: string
+  childId: ChildId
+  weekKey: string
+  templateId: string
+  earnedAt: string
+}
+
+/* ---------------- reset & repair ---------------- */
+
+export type IncidentKind = 'spitting' | 'scattering' | 'untrue' | 'fighting' | 'other'
+
+/** v6: a grown-up-logged repair moment. Private — never shown to the sibling. */
+export interface RepairIncident {
+  id: string
+  childId: ChildId
+  situation: IncidentKind
+  /** Free-text when situation === 'other'. */
+  otherText?: string
+  note?: string
+  /** "Toy set aside" real-world reminder (never touches in-game items). */
+  toyReminder?: { text: string; returnAt?: string }
+  createdAt: string
+  repairedAt?: string
+  /** Set when the child saw the one-time acknowledgment card. */
+  acknowledgedAt?: string
+}
+
 /** Which quests are core (per weekday, 0=Mon..6=Sun) vs bonus for one child. */
 export interface DaySchedule {
   core: Record<number, string[]>
@@ -106,7 +157,7 @@ export interface DaySchedule {
 }
 
 export interface GameState {
-  schemaVersion: 5
+  schemaVersion: 6
   /** Grown-up-editable per-child settings. */
   config: Record<ChildId, ChildConfig>
   /** Schedule history — a day uses the latest entry with effectiveFrom ≤ day. */
@@ -124,6 +175,12 @@ export interface GameState {
   /** Per-device settings. */
   settings: { sound: boolean }
   city: CityState
+  /** v6: weekly challenge per child per ISO week. */
+  weekly: Record<ChildId, Record<string, WeeklyEntry>>
+  /** v6: badges earned from weekly challenges. */
+  badges: WeeklyBadge[]
+  /** v6: grown-up repair log, keyed by incident id. */
+  repairs: Record<string, RepairIncident>
 }
 
 export interface CatalogItem {
@@ -161,6 +218,21 @@ export type Command =
       childId: ChildId
       patch: Partial<ChildConfig>
     }
+  | { type: 'nameCity'; childId: ChildId; name: string }
+  | { type: 'customizeBuilding'; childId: ChildId; projectId: ProjectId; color?: string; name?: string | null }
+  | { type: 'setWeeklyChallenge'; childId: ChildId; weekKey: string; templateId: string }
+  | {
+      type: 'logIncident'
+      childId: ChildId
+      incidentId: string
+      situation: IncidentKind
+      otherText?: string
+      note?: string
+      toyReminder?: { text: string; returnAt?: string }
+    }
+  | { type: 'markRepaired'; incidentId: string }
+  | { type: 'deleteIncident'; incidentId: string }
+  | { type: 'acknowledgeRepair'; incidentId: string }
 
 export type DomainErrorCode =
   | 'already-claimed-today'
@@ -179,6 +251,11 @@ export type DomainErrorCode =
   | 'not-scheduled'
   | 'invalid-schedule'
   | 'invalid-config'
+  | 'invalid-name'
+  | 'invalid-color'
+  | 'invalid-weekly'
+  | 'unknown-incident'
+  | 'incident-not-repaired'
 
 export interface DomainError {
   code: DomainErrorCode
@@ -213,3 +290,9 @@ export const BONUS_REWARD = { coins: 5, stars: 0 } as const
 export const BONUS_SLOTS_PER_DAY = 2
 export const WELCOME_COINS = 20
 export const MAX_LEAGUE_RANK = 14
+/** Coins for finishing a weekly challenge (never stars, outside daily caps). */
+export const WEEKLY_COINS = 20
+/** Repaired incidents are pruned this many days later. */
+export const REPAIR_PRUNE_DAYS = 30
+/** Palette offered for building colors / city accents. */
+export const CITY_PALETTE = ['#e0483e', '#ef8f1a', '#f2c40f', '#58b368', '#4a9ede', '#9a6fe0'] as const

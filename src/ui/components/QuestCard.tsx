@@ -57,6 +57,20 @@ export function QuestCard({
       <div className="quest-text">
         <p className="quest-label">{quest.label}</p>
         {subtitle && <p className="quest-sub">{subtitle}</p>}
+        {status === 'available' && quest.kind.type === 'external' && url && (
+          <a
+            className="open-link"
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14">
+              <path d="M14 4h6v6M20 4l-9 9M18 13v6H5V5h6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            {quest.kind.buttonLabel ?? 'Open'}
+          </a>
+        )}
       </div>
       <button
         className="icon-btn speak-btn"
@@ -72,16 +86,6 @@ export function QuestCard({
       </button>
       {status === 'available' && (
         <span className="quest-actions">
-          {quest.kind.type === 'external' && url && (
-            <a
-              className="btn btn-neutral btn-small"
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {quest.kind.buttonLabel ?? 'Open'}
-            </a>
-          )}
           {quest.kind.type === 'challenge' && (
             <button className="btn btn-big btn-yes" onClick={() => openSheet({ kind: 'challenge', quest })}>
               Start

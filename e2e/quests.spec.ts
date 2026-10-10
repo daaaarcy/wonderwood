@@ -5,6 +5,13 @@ async function switchExplorer(page: Page) {
   await page.getByRole('menuitem', { name: 'Switch explorer' }).click()
 }
 
+async function openBonusFold(page: Page) {
+  const fold = page.locator('.bonus-fold')
+  if ((await fold.count()) > 0 && (await fold.getAttribute('open')) === null) {
+    await fold.locator('summary').click()
+  }
+}
+
 async function pickExplorer(page: Page, name: 'Theodore' | 'Leonard') {
   await page.getByRole('button', { name }).click()
   await expect(page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
@@ -70,6 +77,7 @@ test('Leonard reading flow: books & chapters → correct rewards + journal', asy
 test('external quest: open button never completes the quest', async ({ page }) => {
   await page.goto('/')
   await pickExplorer(page, 'Theodore')
+  await openBonusFold(page)
   const card = page.locator('.quest-card', { hasText: 'Spanish lesson' })
   const open = card.getByRole('link', { name: 'Open Duolingo' })
   await expect(open).toBeVisible()
@@ -83,6 +91,7 @@ test('external quest: open button never completes the quest', async ({ page }) =
 test('math challenge: wrong → try again → right, then send for bonus coins', async ({ page }) => {
   await page.goto('/')
   await pickExplorer(page, 'Theodore')
+  await openBonusFold(page)
   // math-mission is bonus for Theodore
   const card = page.locator('.quest-card', { hasText: "Builders' math" })
   await card.getByRole('button', { name: 'Start' }).click()
@@ -130,6 +139,7 @@ test('math challenge: wrong → try again → right, then send for bonus coins',
 test('bonus slots cap: third bonus claim approved → 0 coins + full message', async ({ page }) => {
   await page.goto('/')
   await pickExplorer(page, 'Theodore')
+  await openBonusFold(page)
   for (const label of ["Builders' math", 'Extra Spanish', 'Try some French']) {
     const card = page.locator('.quest-card', { hasText: label })
     if (label === "Builders' math") {

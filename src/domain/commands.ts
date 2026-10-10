@@ -13,9 +13,20 @@ import type {
   LedgerEntry,
   ProjectId,
   Purchase,
+  RepairIncident,
   Result,
 } from './types.ts'
-import { BONUS_REWARD, BONUS_SLOTS_PER_DAY, CHILD_IDS, CORE_REWARD, MAX_LEAGUE_RANK } from './types.ts'
+import {
+  BONUS_REWARD,
+  BONUS_SLOTS_PER_DAY,
+  CHILD_IDS,
+  CITY_PALETTE,
+  CORE_REWARD,
+  MAX_LEAGUE_RANK,
+  REPAIR_PRUNE_DAYS,
+  WEEKLY_COINS,
+} from './types.ts'
+import { DEFAULT_WEEKLY, WEEKLY_TEMPLATES, weeklyTemplateById } from '../data/weekly.ts'
 
 const ok = <T>(value: T): Result<T> => ({ ok: true, value })
 const err = (code: DomainError['code'], message: string): Result<never> => ({
@@ -362,6 +373,7 @@ export function approveClaim(
   const approved: Claim = { ...claim, status: 'approved', decidedAt, reward }
   let next = awardQuest(withClaim(state, approved), claim.childId, claim.id, reward, decidedAt)
   next = recheckWeekAfterApproval(next, approved)
+  next = awardWeeklyIfDone(next, approved, now)
   return { state: next, result: ok(approved) }
 }
 
@@ -705,7 +717,12 @@ export function buyKit(
     if (nextId) {
       projects[nextId] = { ...projects[nextId], status: 'building' }
     }
-    city = { ...city, projects, currentProjectId: nextId, suggestedProjectId: null }
+    const postcards = [...(city.postcards ?? [])]
+    const postcardId = `postcard-${cmd.projectId}`
+    if (!postcards.some((p) => p.id === postcardId)) {
+      postcards.push({ id: postcardId, projectId: cmd.projectId, openedAt: at })
+    }
+    city = { ...city, projects, postcards, currentProjectId: nextId, suggestedProjectId: null }
   } else {
     city = {
       ...city,
@@ -769,6 +786,300 @@ export function chooseNextProject(
   return { state: next, result: ok(next) }
 }
 
+/* ---------------- city personalization ---------------- */
+
+export function nameCity(
+  state: GameState,
+  cmd: { childId: ChildId; name: string },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<GameState> {
+  void now
+  void deps
+  const name = cmd.name.trim().replace(/\s+/g, ' ')
+  if (name.length === 0 || name.length > 30) {
+    return { state, result: err('invalid-name', 'Town names are 1–30 letters.') }
+  }
+  const next = withCity(state, { ...state.city, name })
+  return { state: next, result: ok(next) }
+}
+
+export function customizeBuilding(
+  state: GameState,
+  cmd: { childId: ChildId; projectId: ProjectId; color?: string; name?: string | null },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<GameState> {
+  void now
+  void deps
+  const project = state.city.projects[cmd.projectId]
+  if (!project || project.status !== 'open') {
+    return { state, result: err('not-current-project', 'Only open buildings can be personalised.') }
+  }
+  if (cmd.color !== undefined && !(CITY_PALETTE as readonly string[]).includes(cmd.color)) {
+    return { state, result: err('invalid-color', 'Pick one of the palette colours.') }
+  }
+  let name: string | undefined
+  if (cmd.name !== undefined && cmd.name !== null) {
+    name = cmd.name.trim().replace(/\s+/g, ' ')
+    if (name.length === 0) name = undefined
+    if (name && name.length > 30) {
+      return { state, result: err('invalid-name', 'Building names are up to 30 letters.') }
+    }
+  }
+  const next = withCity(state, {
+    ...state.city,
+    projects: {
+      ...state.city.projects,
+      [cmd.projectId]: {
+        ...project,
+        ...(cmd.color !== undefined ? { color: cmd.color } : {}),
+        ...(cmd.name !== undefined ? { name } : {}),
+      },
+    },
+  })
+  return { state: next, result: ok(next) }
+}
+
+/* ---------------- weekly challenge ---------------- */
+
+/** Distinct days in `weekKey` with an approved claim for any of the quests. */
+export function weeklyDaysCount(
+  state: GameState,
+  childId: ChildId,
+  weekKey: string,
+  questIds: string[],
+): number {
+  const sunday = addDaysKey(weekKey, 6)
+  const days = new Set<string>()
+  for (const c of Object.values(state.claims)) {
+    if (
+      c.childId === childId &&
+      c.status === 'approved' &&
+      questIds.includes(c.questId) &&
+      c.activityDate >= weekKey &&
+      c.activityDate <= sunday
+    ) {
+      days.add(c.activityDate)
+    }
+  }
+  return days.size
+}
+
+/** The template a child is doing this week (chosen or default). */
+export function weeklyTemplateFor(state: GameState, childId: ChildId, weekKey: string): string {
+  return state.weekly[childId]?.[weekKey]?.templateId ?? DEFAULT_WEEKLY[childId]
+}
+
+/**
+ * After an approval, award the weekly challenge for the claim's week if the
+ * criterion is now met. Exactly once per child per week.
+ */
+function awardWeeklyIfDone(state: GameState, claim: Claim, now: Date): GameState {
+  const weekKey = mondayKeyOf(claim.activityDate)
+  const entry = state.weekly[claim.childId]?.[weekKey]
+  if (entry?.completedAt) return state
+  const template = weeklyTemplateById(entry?.templateId ?? DEFAULT_WEEKLY[claim.childId])
+  if (!template) return state
+  if (weeklyDaysCount(state, claim.childId, weekKey, template.questIds) < template.days) return state
+  const at = now.toISOString()
+  const badgeId = `badge-${claim.childId}-${weekKey}`
+  const child = state.children[claim.childId]
+  const next = withChild(state, claim.childId, { ...child, coins: child.coins + WEEKLY_COINS })
+  return {
+    ...next,
+    weekly: {
+      ...next.weekly,
+      [claim.childId]: {
+        ...next.weekly[claim.childId],
+        [weekKey]: { templateId: template.id, completedAt: at },
+      },
+    },
+    badges: [
+      ...next.badges,
+      { id: badgeId, childId: claim.childId, weekKey, templateId: template.id, earnedAt: at },
+    ],
+    ledger: [
+      ...next.ledger,
+      {
+        id: `weekly-${claim.childId}-${weekKey}`,
+        childId: claim.childId,
+        coins: WEEKLY_COINS,
+        stars: 0,
+        reason: 'weekly',
+        refId: badgeId,
+        at,
+      },
+    ],
+  }
+}
+
+/** Templates whose quests are in the child's current schedule. */
+export function eligibleWeeklyTemplates(state: GameState, childId: ChildId): string[] {
+  const today = localDateKey(new Date(), state.timeZone)
+  const sched = scheduleForDate(state, today)[childId]
+  const scheduled = new Set<string>([...sched.bonus, ...Object.values(sched.core).flat()])
+  return WEEKLY_TEMPLATES.filter((t) => t.questIds.some((q) => scheduled.has(q))).map((t) => t.id)
+}
+
+export function setWeeklyChallenge(
+  state: GameState,
+  cmd: { childId: ChildId; weekKey: string; templateId: string },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<GameState> {
+  void deps
+  const template = weeklyTemplateById(cmd.templateId)
+  if (!template) {
+    return { state, result: err('invalid-weekly', 'No such weekly challenge.') }
+  }
+  const currentWeek = mondayKeyOf(localDateKey(now, state.timeZone))
+  if (cmd.weekKey < currentWeek) {
+    return { state, result: err('invalid-weekly', 'Pick this week or a future one.') }
+  }
+  const existing = state.weekly[cmd.childId]?.[cmd.weekKey]
+  if (existing?.completedAt) {
+    return { state, result: err('invalid-weekly', 'That week is already done — leave it be!') }
+  }
+  if (!eligibleWeeklyTemplates(state, cmd.childId).includes(cmd.templateId)) {
+    return { state, result: err('invalid-weekly', 'That challenge needs quests not in the schedule.') }
+  }
+  const next: GameState = {
+    ...state,
+    weekly: {
+      ...state.weekly,
+      [cmd.childId]: {
+        ...state.weekly[cmd.childId],
+        [cmd.weekKey]: { templateId: cmd.templateId, completedAt: existing?.completedAt },
+      },
+    },
+  }
+  return { state: next, result: ok(next) }
+}
+
+/* ---------------- reset & repair ---------------- */
+
+const INCIDENT_KINDS = new Set(['spitting', 'scattering', 'untrue', 'fighting', 'other'])
+
+/** Drop incidents repaired more than REPAIR_PRUNE_DAYS ago (run inside writes). */
+function pruneRepairs(state: GameState, now: Date): GameState {
+  const cutoff = now.getTime() - REPAIR_PRUNE_DAYS * 86_400_000
+  let changed = false
+  const repairs: typeof state.repairs = {}
+  for (const [id, r] of Object.entries(state.repairs)) {
+    if (r.repairedAt && Date.parse(r.repairedAt) < cutoff) {
+      changed = true
+      continue
+    }
+    repairs[id] = r
+  }
+  return changed ? { ...state, repairs } : state
+}
+
+export function logIncident(
+  state: GameState,
+  cmd: {
+    childId: ChildId
+    incidentId: string
+    situation: RepairIncident['situation']
+    otherText?: string
+    note?: string
+    toyReminder?: { text: string; returnAt?: string }
+  },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<GameState> {
+  void deps
+  const base = pruneRepairs(state, now)
+  if (!INCIDENT_KINDS.has(cmd.situation)) {
+    return { state: base, result: err('invalid-config', 'Pick a situation.') }
+  }
+  if (base.repairs[cmd.incidentId]) {
+    return { state: base, result: ok(base) } // idempotent
+  }
+  const incident: RepairIncident = {
+    id: cmd.incidentId,
+    childId: cmd.childId,
+    situation: cmd.situation,
+    otherText: cmd.otherText?.slice(0, 200),
+    note: cmd.note?.slice(0, 200),
+    toyReminder: cmd.toyReminder
+      ? { text: cmd.toyReminder.text.slice(0, 120), returnAt: cmd.toyReminder.returnAt }
+      : undefined,
+    createdAt: now.toISOString(),
+  }
+  const next: GameState = {
+    ...base,
+    repairs: { ...base.repairs, [incident.id]: incident },
+  }
+  return { state: next, result: ok(next) }
+}
+
+export function markRepaired(
+  state: GameState,
+  cmd: { incidentId: string },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<GameState> {
+  void deps
+  const base = pruneRepairs(state, now)
+  const incident = base.repairs[cmd.incidentId]
+  if (!incident) {
+    return { state: base, result: err('unknown-incident', 'That note does not exist.') }
+  }
+  if (incident.repairedAt) return { state: base, result: ok(base) }
+  const next: GameState = {
+    ...base,
+    repairs: {
+      ...base.repairs,
+      [incident.id]: { ...incident, repairedAt: now.toISOString() },
+    },
+  }
+  return { state: next, result: ok(next) }
+}
+
+export function deleteIncident(
+  state: GameState,
+  cmd: { incidentId: string },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<GameState> {
+  void deps
+  const base = pruneRepairs(state, now)
+  if (!base.repairs[cmd.incidentId]) {
+    return { state: base, result: err('unknown-incident', 'That note does not exist.') }
+  }
+  const repairs = { ...base.repairs }
+  delete repairs[cmd.incidentId]
+  return { state: { ...base, repairs }, result: ok({ ...base, repairs }) }
+}
+
+export function acknowledgeRepair(
+  state: GameState,
+  cmd: { incidentId: string },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<GameState> {
+  void deps
+  const base = pruneRepairs(state, now)
+  const incident = base.repairs[cmd.incidentId]
+  if (!incident) {
+    return { state: base, result: err('unknown-incident', 'That note does not exist.') }
+  }
+  if (!incident.repairedAt) {
+    return { state: base, result: err('incident-not-repaired', 'It is not repaired yet.') }
+  }
+  if (incident.acknowledgedAt) return { state: base, result: ok(base) }
+  const next: GameState = {
+    ...base,
+    repairs: {
+      ...base.repairs,
+      [incident.id]: { ...incident, acknowledgedAt: now.toISOString() },
+    },
+  }
+  return { state: next, result: ok(next) }
+}
+
 /** Command types that must run with grown-up authority (server enforces later). */
 export const GROWN_UP_COMMANDS: ReadonlySet<Command['type']> = new Set([
   'approveClaim',
@@ -778,6 +1089,10 @@ export const GROWN_UP_COMMANDS: ReadonlySet<Command['type']> = new Set([
   'updateSchedule',
   'setPaused',
   'updateChildConfig',
+  'setWeeklyChallenge',
+  'logIncident',
+  'markRepaired',
+  'deleteIncident',
 ])
 
 export function setSound(
@@ -831,5 +1146,24 @@ export function applyCommand(
       return setPaused(state, cmd, now, deps)
     case 'updateChildConfig':
       return updateChildConfig(state, cmd, now, deps)
+    case 'nameCity':
+      return nameCity(state, cmd, now, deps)
+    case 'customizeBuilding':
+      return customizeBuilding(state, cmd, now, deps)
+    case 'setWeeklyChallenge':
+      return setWeeklyChallenge(state, cmd, now, deps)
+    case 'logIncident':
+      return logIncident(state, cmd, now, deps)
+    case 'markRepaired':
+      return markRepaired(state, cmd, now, deps)
+    case 'deleteIncident':
+      return deleteIncident(state, cmd, now, deps)
+    case 'acknowledgeRepair':
+      return acknowledgeRepair(state, cmd, now, deps)
+    default: {
+      const _exhaustive: never = cmd
+      void _exhaustive
+      return { state, result: err('invalid-config', 'Unknown command.') }
+    }
   }
 }

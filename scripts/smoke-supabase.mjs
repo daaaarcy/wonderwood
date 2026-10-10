@@ -56,7 +56,7 @@ try {
   const hid = ch.data?.householdId
   created.households.push(hid)
   check('createHousehold', !!hid)
-  check('household state is v5 + tz', ch.data?.state?.schemaVersion === 5 && ch.data?.state?.timeZone === 'America/Los_Angeles')
+  check('household state is v6 + tz', ch.data?.state?.schemaVersion === 6 && ch.data?.state?.timeZone === 'America/Los_Angeles')
 
   // anonymous cannot createHousehold
   mark('stranger anon'); const { error: ae } = await stranger.auth.signInAnonymously()
@@ -163,6 +163,27 @@ try {
   const stars = st?.children?.leonard?.stars
   const rew = ids.map((id) => st?.claims?.[id]?.reward?.coins)
   check('reading rewards 10/5/5/0 + 1 star', JSON.stringify(rew) === '[10,5,5,0]' && stars === 1 && coins === 20 + 20, `coins=${coins} stars=${stars} rew=${JSON.stringify(rew)}`)
+
+  // --- v6: weekly challenge + repairs need PIN; coins unchanged by repairs ---
+  mark('v6 commands')
+  const weekKey = '2026-10-12'
+  const noPinW = await fn(grown, { action: 'command', householdId: hid, command: { type: 'setWeeklyChallenge', childId: 'leonard', weekKey, templateId: 'housework-3' } })
+  check('setWeeklyChallenge without PIN rejected', noPinW.error !== null)
+  const pinW = await fn(grown, { action: 'command', householdId: hid, pin: '1234', command: { type: 'setWeeklyChallenge', childId: 'leonard', weekKey, templateId: 'housework-3' } })
+  check('setWeeklyChallenge with PIN ok', pinW.data?.result?.ok === true)
+  const inc = await fn(grown, { action: 'command', householdId: hid, pin: '1234', command: { type: 'logIncident', childId: 'theodore', incidentId: 'smoke-inc', situation: 'scattering' } })
+  check('logIncident with PIN ok', inc.data?.result?.ok === true)
+  const coinsBefore = inc.data?.state?.children?.theodore?.coins
+  const rep = await fn(grown, { action: 'command', householdId: hid, pin: '1234', command: { type: 'markRepaired', incidentId: 'smoke-inc' } })
+  check('markRepaired with PIN ok', rep.data?.result?.ok === true)
+  check('repairs leave coins unchanged', rep.data?.state?.children?.theodore?.coins === coinsBefore && rep.data?.state?.children?.theodore?.stars === inc.data?.state?.children?.theodore?.stars)
+  const noPinInc = await fn(grown, { action: 'command', householdId: hid, command: { type: 'deleteIncident', incidentId: 'smoke-inc' } })
+  check('deleteIncident without PIN rejected', noPinInc.error !== null)
+  const del = await fn(grown, { action: 'command', householdId: hid, pin: '1234', command: { type: 'deleteIncident', incidentId: 'smoke-inc' } })
+  check('deleteIncident with PIN ok', del.data?.result?.ok === true)
+  // child-allowed: nameCity without PIN
+  const nc = await fn(kid, { action: 'command', householdId: hid, command: { type: 'nameCity', childId: 'theodore', name: 'Sunny Town' } })
+  check('nameCity is child-allowed (no PIN)', nc.data?.result?.ok === true)
 
   // --- RLS: stranger cannot read the household; publishable cannot read secrets ---
   const { data: rls } = await stranger.from('households').select('id').eq('id', hid)
