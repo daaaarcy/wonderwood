@@ -1,5 +1,4 @@
-import { localDateKey } from './state'
-import { addDays, eligibleDays, mondayKey, parseDateKey } from './week'
+import { addDaysKey, eligibleDays, localDateKey, mondayKeyOf } from './week.ts'
 import type {
   ChildId,
   Claim,
@@ -13,8 +12,8 @@ import type {
   ProjectId,
   Purchase,
   Result,
-} from './types'
-import { CHILD_IDS, MAX_LEAGUE_RANK, QUEST_REWARD } from './types'
+} from './types.ts'
+import { CHILD_IDS, MAX_LEAGUE_RANK, QUEST_REWARD } from './types.ts'
 
 const ok = <T>(value: T): Result<T> => ({ ok: true, value })
 const err = (code: DomainError['code'], message: string): Result<never> => ({
@@ -74,7 +73,7 @@ const MIN_ACTIVE_DAYS = 3
 const MIN_ELIGIBLE_DAYS = 3
 
 function approvedClaimsInWeek(state: GameState, childId: ChildId, weekKey: string): Claim[] {
-  const sunday = localDateKey(addDays(parseDateKey(weekKey), 6))
+  const sunday = addDaysKey(weekKey, 6)
   return Object.values(state.claims).filter(
     (c) =>
       c.childId === childId &&
@@ -86,8 +85,8 @@ function approvedClaimsInWeek(state: GameState, childId: ChildId, weekKey: strin
 
 /** Does this child qualify for promotion from week `weekKey` right now? */
 function weekQualifies(state: GameState, childId: ChildId, weekKey: string): boolean {
-  const createdKey = localDateKey(new Date(state.createdAt))
-  const sunday = localDateKey(addDays(parseDateKey(weekKey), 6))
+  const createdKey = localDateKey(new Date(state.createdAt), state.timeZone)
+  const sunday = addDaysKey(weekKey, 6)
   const eligible = eligibleDays(weekKey, createdKey, sunday)
   if (eligible < MIN_ELIGIBLE_DAYS) return false
   const claims = approvedClaimsInWeek(state, childId, weekKey)
@@ -126,7 +125,7 @@ function promoteChild(state: GameState, childId: ChildId, weekKey: string): Game
  * non-promoted — a delayed approval can still count toward the right week.
  */
 function recheckWeekAfterApproval(state: GameState, claim: Claim): GameState {
-  const weekKey = mondayKey(parseDateKey(claim.activityDate))
+  const weekKey = mondayKeyOf(claim.activityDate)
   const league = state.children[claim.childId].league
   const record = league.evaluatedWeeks[weekKey]
   if (!record || record.promoted) return state
@@ -141,18 +140,17 @@ export function evaluateLeagues(
   deps: CommandDeps,
 ): CommandOutcome<{ childId: ChildId; weekKey: string; promoted: boolean }[]> {
   void deps
-  const createdKey = localDateKey(new Date(state.createdAt))
-  const currentWeek = mondayKey(now)
+  const createdKey = localDateKey(new Date(state.createdAt), state.timeZone)
+  const currentWeek = mondayKeyOf(localDateKey(now, state.timeZone))
   let next = state
   const results: { childId: ChildId; weekKey: string; promoted: boolean }[] = []
 
   // Every fully-ended week from the week of createdAt through last week.
   for (
-    let weekStart = parseDateKey(mondayKey(parseDateKey(createdKey)));
-    localDateKey(weekStart) < currentWeek;
-    weekStart = addDays(weekStart, 7)
+    let weekKey = mondayKeyOf(createdKey);
+    weekKey < currentWeek;
+    weekKey = addDaysKey(weekKey, 7)
   ) {
-    const weekKey = localDateKey(weekStart)
     for (const childId of CHILD_IDS) {
       const league = next.children[childId].league
       if (league.evaluatedWeeks[weekKey]) continue
@@ -207,7 +205,7 @@ function insertClaim(
     // Idempotent re-send of the same claimId.
     return { state, result: ok(existing) }
   }
-  const activityDate = localDateKey(now)
+  const activityDate = localDateKey(now, state.timeZone)
   const clash = findActiveClaim(state, cmd.childId, cmd.questId, activityDate)
   if (clash) {
     return {
@@ -296,7 +294,7 @@ export function parentCompleteAndApprove(
     }
     return { state, result: ok(byId) }
   }
-  const today = localDateKey(now)
+  const today = localDateKey(now, state.timeZone)
   const active = findActiveClaim(state, cmd.childId, cmd.questId, today)
   if (active) {
     if (active.status === 'pending') {
@@ -418,31 +416,6 @@ export function setWish(
   }
   const child = state.children[cmd.childId]
   const next = withChild(state, cmd.childId, { ...child, wishItem: cmd.itemId })
-  return { state: next, result: ok(next) }
-}
-
-/** Simple deterministic fallback hash — NOT cryptographic. The UI passes a real
- *  SHA-256 digest via cmd.pinHash (crypto.subtle); this only guards tests/CLI use. */
-export function fallbackHashPin(pin: string): string {
-  let h = 5381
-  for (let i = 0; i < pin.length; i += 1) {
-    h = ((h << 5) + h + pin.charCodeAt(i)) | 0
-  }
-  return `djb2-${(h >>> 0).toString(16)}`
-}
-
-export function setParentPin(
-  state: GameState,
-  cmd: { pin: string; pinHash?: string },
-  now: Date,
-  deps: CommandDeps,
-): CommandOutcome<GameState> {
-  void now
-  if (!/^\d{4}$/.test(cmd.pin)) {
-    return { state, result: err('invalid-pin', 'The PIN must be exactly 4 digits.') }
-  }
-  const parentPinHash = cmd.pinHash ?? deps.hashPin(cmd.pin)
-  const next: GameState = { ...state, parentPinHash }
   return { state: next, result: ok(next) }
 }
 
@@ -583,7 +556,6 @@ export const GROWN_UP_COMMANDS: ReadonlySet<Command['type']> = new Set([
   'approveClaim',
   'rejectClaim',
   'parentCompleteAndApprove',
-  'setParentPin',
   'chooseNextProject',
 ])
 
@@ -620,8 +592,6 @@ export function applyCommand(
       return equip(state, cmd, now, deps)
     case 'setWish':
       return setWish(state, cmd, now, deps)
-    case 'setParentPin':
-      return setParentPin(state, cmd, now, deps)
     case 'evaluateLeagues':
       return evaluateLeagues(state, {}, now, deps)
     case 'acknowledgePromotion':

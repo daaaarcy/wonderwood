@@ -1,6 +1,7 @@
 import { applyCommand } from '../domain/commands'
 import { initialState } from '../domain/state'
 import type { CityState, Command, CommandDeps, GameState, Result } from '../domain/types'
+import { localGrownUpGate, type GrownUpGate } from './gate'
 import type { GameRepository } from './GameRepository'
 
 export const STORAGE_KEY = 'wonderwood:v1'
@@ -38,6 +39,12 @@ function isValidV2(value: Record<string, unknown>): boolean {
   return true
 }
 
+function isValidV4(value: Record<string, unknown>): boolean {
+  if (!isValidV3(value)) return false
+  const s = value as unknown as GameState
+  return typeof s.timeZone === 'string' && s.timeZone.length > 0
+}
+
 function isValidV3(value: Record<string, unknown>): boolean {
   if (!isValidV2(value)) return false
   const s = value as unknown as GameState
@@ -70,13 +77,28 @@ function initialCity(foundersBridgePlanks: number): CityState {
 }
 
 /** v2 → v3: preserve everything; the old star-bridge becomes a keepsake. */
-function migrateV2(v2: GameStateV2): GameState {
+type GameStateV3 = Omit<GameState, 'schemaVersion' | 'timeZone'> & {
+  schemaVersion: 3
+  parentPinHash?: string | null
+}
+
+function migrateV2(v2: GameStateV2): GameStateV3 {
   const planks = Math.min(12, v2.children.theodore.stars + v2.children.leonard.stars)
   return { ...v2, schemaVersion: 3, city: initialCity(planks) }
 }
 
-/** v2 shape: same as v3 minus the city block. */
-type GameStateV2 = Omit<GameState, 'schemaVersion' | 'city'> & { schemaVersion: 2 }
+/** v3 → v4: the PIN moves to server-side secrets; stamp the family's time zone. */
+function migrateV3(v3: GameStateV3, timeZone: string): GameState {
+  const rest = { ...v3 }
+  delete rest.parentPinHash
+  return { ...rest, schemaVersion: 4, timeZone }
+}
+
+/** v2 shape: same as v3 minus the city block (v2 still had parentPinHash). */
+type GameStateV2 = Omit<GameState, 'schemaVersion' | 'city' | 'timeZone'> & {
+  schemaVersion: 2
+  parentPinHash?: string | null
+}
 
 /** v1 → v2: preserve everything; league starts at rank 1, sound on. */
 function migrateV1(v1: Record<string, unknown>): GameStateV2 | null {
@@ -103,19 +125,23 @@ function migrateV1(v1: Record<string, unknown>): GameStateV2 | null {
 }
 
 /** Parse raw JSON → current-schema GameState (migrating v1), or null. */
-export function parseStoredState(raw: string): GameState | null {
+export function parseStoredState(raw: string, timeZone = 'UTC'): GameState | null {
   try {
     const value: unknown = JSON.parse(raw)
     if (typeof value !== 'object' || value === null) return null
     const version = (value as { schemaVersion?: unknown }).schemaVersion
-    if (version === 3) return isValidV3(value as Record<string, unknown>) ? (value as GameState) : null
+    if (version === 4) return isValidV4(value as Record<string, unknown>) ? (value as GameState) : null
+    if (version === 3) {
+      const v3 = isValidV3(value as Record<string, unknown>) ? (value as unknown as GameStateV3) : null
+      return v3 ? migrateV3(v3, timeZone) : null
+    }
     if (version === 2) {
       const v2 = isValidV2(value as Record<string, unknown>) ? (value as unknown as GameStateV2) : null
-      return v2 ? migrateV2(v2) : null
+      return v2 ? migrateV3(migrateV2(v2), timeZone) : null
     }
     if (version === 1) {
       const v2 = migrateV1(value as Record<string, unknown>)
-      return v2 ? migrateV2(v2) : null
+      return v2 ? migrateV3(migrateV2(v2), timeZone) : null
     }
     return null
   } catch {
@@ -124,24 +150,31 @@ export function parseStoredState(raw: string): GameState | null {
 }
 
 export class LocalStorageRepository implements GameRepository {
+  readonly gate: GrownUpGate = localGrownUpGate()
   private state: GameState
   private listeners = new Set<() => void>()
   private readonly storage: Storage
   private readonly deps: CommandDeps
   private readonly key: string
+  private readonly timeZone: string
   private readonly onStorage: ((e: StorageEvent) => void) | null = null
 
   constructor(storage: Storage, deps: CommandDeps, key: string = STORAGE_KEY) {
     this.storage = storage
     this.deps = deps
     this.key = key
+    try {
+      this.timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    } catch {
+      this.timeZone = 'UTC'
+    }
     this.state = this.read()
 
     // Cross-tab sync: a parent approving in another tab updates this tab live.
     if (typeof window !== 'undefined' && storage === window.localStorage) {
       this.onStorage = (e: StorageEvent) => {
         if (e.key !== this.key || e.newValue === null) return
-        const parsed = parseStoredState(e.newValue)
+        const parsed = parseStoredState(e.newValue, this.timeZone)
         if (parsed && parsed !== this.state) {
           this.state = parsed
           this.emit()
@@ -154,11 +187,11 @@ export class LocalStorageRepository implements GameRepository {
   private read(): GameState {
     const raw = this.storage.getItem(this.key)
     if (raw === null) {
-      const fresh = initialState()
+      const fresh = initialState(new Date(), this.timeZone)
       this.storage.setItem(this.key, JSON.stringify(fresh))
       return fresh
     }
-    const parsed = parseStoredState(raw)
+    const parsed = parseStoredState(raw, this.timeZone)
     if (parsed) return parsed
     // Unknown schema or corrupt data: keep a backup copy, then start fresh.
     try {
@@ -166,7 +199,7 @@ export class LocalStorageRepository implements GameRepository {
     } catch {
       // Backup is best-effort; never block a fresh start.
     }
-    const fresh = initialState()
+    const fresh = initialState(new Date(), this.timeZone)
     this.storage.setItem(this.key, JSON.stringify(fresh))
     return fresh
   }

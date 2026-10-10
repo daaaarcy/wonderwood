@@ -9,6 +9,14 @@ export function useRepository(): GameRepository {
   return repo
 }
 
+export function useRepoStatus(): 'loading' | 'ready' | 'offline' {
+  const repo = useRepository()
+  return useSyncExternalStore(
+    (onChange) => repo.subscribeStatus?.(onChange) ?? (() => {}),
+    () => repo.status ?? 'ready',
+  )
+}
+
 export function useGameState(): GameState {
   const repo = useRepository()
   return useSyncExternalStore(

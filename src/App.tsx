@@ -3,6 +3,9 @@ import type { ChildId } from './domain/types'
 import { LEAGUES } from './data/leagues'
 import { RepositoryProvider } from './storage/repo-context'
 import { useRepository } from './storage/hooks'
+import { BACKEND, getSupabase } from './backend/supabase'
+import { SupabaseRepository } from './storage/SupabaseRepository'
+import { Onboarding } from './ui/screens/Onboarding'
 import { LeagueBadge } from './ui/components/LeagueBadge'
 import { ChildChrome, type ChildTab } from './ui/components/ChildChrome'
 import { ProfilePicker } from './ui/screens/ProfilePicker'
@@ -49,11 +52,11 @@ function Shell() {
     setScreen('home')
   }
 
-  if (screen === 'picker' || childId === null) {
-    return <ProfilePicker onPick={pickChild} onGrownups={() => setScreen('grownups')} />
-  }
   if (screen === 'grownups') {
     return <Grownups onExit={() => setScreen('picker')} />
+  }
+  if (screen === 'picker' || childId === null) {
+    return <ProfilePicker onPick={pickChild} onGrownups={() => setScreen('grownups')} />
   }
   return (
     <ChildChrome childId={childId} tab={screen} onTab={setScreen} onSwitch={() => setScreen('picker')}>
@@ -65,7 +68,87 @@ function Shell() {
   )
 }
 
+/** Supabase mode: session → membership → repository, with onboarding in front. */
+function SupabaseShell() {
+  const [repo, setRepo] = useState<SupabaseRepository | null>(null)
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  const [error, setError] = useState('')
+  const [pairedAt, setPairedAt] = useState(0)
+
+  useEffect(() => {
+    const sb = getSupabase()
+    let live = true
+
+    const findHousehold = async () => {
+      const { data: session } = await sb.auth.getSession()
+      if (!session.session) {
+        if (live) setNeedsOnboarding(true)
+        return
+      }
+      const { data: member } = await sb
+        .from('household_members')
+        .select('household_id')
+        .eq('user_id', session.session.user.id)
+        .limit(1)
+        .maybeSingle()
+      if (!member) {
+        if (live) setNeedsOnboarding(true)
+        return
+      }
+      const { data: row, error: rowErr } = await sb
+        .from('households')
+        .select('state, version')
+        .eq('id', member.household_id)
+        .single()
+      if (rowErr || !row) {
+        if (live) setError('Could not reach the town — check the internet and reload.')
+        return
+      }
+      if (live) {
+        setRepo(
+          new SupabaseRepository(
+            sb,
+            member.household_id as string,
+            row as { state: never; version: number },
+          ),
+        )
+      }
+    }
+    void findHousehold()
+
+    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
+      if (session && live) void findHousehold()
+    })
+    return () => {
+      live = false
+      sub.subscription.unsubscribe()
+    }
+  }, [pairedAt])
+
+  if (repo) {
+    return (
+      <RepositoryProvider repository={repo}>
+        <Shell />
+      </RepositoryProvider>
+    )
+  }
+  if (needsOnboarding) {
+    return (
+      <Onboarding
+        sb={getSupabase()}
+        onHousehold={() => setPairedAt((n) => n + 1)}
+      />
+    )
+  }
+  return (
+    <div className="screen" style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <p className="muted">{error || 'Loading…'}</p>
+    </div>
+  )
+}
+
 export function App() {
+  if (BACKEND === 'supabase') return <SupabaseShell />
   return (
     <RepositoryProvider>
       <Shell />

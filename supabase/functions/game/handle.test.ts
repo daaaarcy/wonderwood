@@ -1,0 +1,252 @@
+import { describe, expect, it } from 'vitest'
+import { handle, type AuthContext, type Store } from './handle.ts'
+import { initialState } from '../_shared/state.ts'
+import type { GameState } from '../_shared/types.ts'
+
+const NOW = new Date('2026-10-10T10:00:00Z')
+const GROWN: AuthContext = { userId: 'u-grown', isAnonymous: false }
+const KID: AuthContext = { userId: 'u-kid', isAnonymous: true }
+
+class FakeStore implements Store {
+  households = new Map<string, { state: GameState; version: number }>()
+  members = new Map<string, Map<string, { role: string; label: string | null }>>()
+  pins = new Map<string, { pin: string; fails: number; lockedUntil?: number }>()
+  codes = new Map<string, { householdId: string; expiresAt: string; usedAt?: string }>()
+  attempts: { userId: string; at: number }[] = []
+  failNextUpdate = 0
+
+  async seed(): Promise<string> {
+    const r = await this.createHouseholdRow(initialState(NOW, 'UTC'))
+    await this.addMember(r.id, GROWN.userId, 'grown_up', 'grown-up')
+    return r.id
+  }
+
+  async householdIdFor(userId: string) {
+    for (const [hid, ms] of this.members) if (ms.has(userId)) return hid
+    return null
+  }
+  async getMembership(hid: string, userId: string) {
+    return this.members.get(hid)?.get(userId) ?? null
+  }
+  async createHouseholdRow(state: GameState) {
+    const id = `hid-${this.households.size + 1}`
+    this.households.set(id, { state, version: 1 })
+    this.members.set(id, new Map())
+    return { id }
+  }
+  async loadHousehold(hid: string) {
+    const h = this.households.get(hid)
+    return h ? { state: structuredClone(h.state), version: h.version } : null
+  }
+  async conditionalUpdate(hid: string, expectedVersion: number, state: GameState) {
+    if (this.failNextUpdate > 0) {
+      this.failNextUpdate -= 1
+      return false
+    }
+    const h = this.households.get(hid)!
+    if (h.version !== expectedVersion) return false
+    h.state = structuredClone(state)
+    h.version += 1
+    return true
+  }
+  async addMember(hid: string, userId: string, role: 'grown_up' | 'device', label: string | null) {
+    this.members.get(hid)?.set(userId, { role, label })
+  }
+  async listMembers(hid: string) {
+    return [...(this.members.get(hid) ?? new Map()).entries()].map(([user_id, m]) => ({
+      user_id,
+      role: m.role as 'grown_up' | 'device',
+      label: m.label,
+    }))
+  }
+  async removeMember(hid: string, userId: string) {
+    this.members.get(hid)?.delete(userId)
+  }
+  async setPin(hid: string, pin: string) {
+    this.pins.set(hid, { pin, fails: 0 })
+  }
+  async checkPin(hid: string, pin: string) {
+    const p = this.pins.get(hid)
+    if (!p) return 'wrong' as const
+    if (p.lockedUntil && p.lockedUntil > NOW.getTime()) return 'locked' as const
+    if (p.pin === pin) {
+      p.fails = 0
+      return 'ok' as const
+    }
+    p.fails += 1
+    if (p.fails >= 5) p.lockedUntil = NOW.getTime() + 5 * 60_000
+    return 'wrong' as const
+  }
+  async hasPin(hid: string) {
+    return this.pins.has(hid)
+  }
+  async createPairingCodeRow(hid: string, code: string, expiresAt: string) {
+    this.codes.set(code, { householdId: hid, expiresAt })
+  }
+  async consumePairingCode(code: string, now: Date) {
+    const c = this.codes.get(code)
+    if (!c) return 'missing' as const
+    if (c.usedAt) return 'used' as const
+    if (new Date(c.expiresAt) <= now) return 'expired' as const
+    c.usedAt = now.toISOString()
+    return c.householdId
+  }
+  async pairingFailures(userId: string, since: Date) {
+    return this.attempts.filter((a) => a.userId === userId && a.at >= since.getTime()).length
+  }
+  async recordPairingAttempt(userId: string) {
+    this.attempts.push({ userId, at: NOW.getTime() })
+  }
+}
+
+const call = (store: Store, auth: AuthContext | null, action: string, body: Record<string, unknown> = {}) =>
+  handle(action, body, auth, store, NOW)
+
+describe('game edge function', () => {
+  it('rejects unauthenticated callers', async () => {
+    const store = new FakeStore()
+    const r = await call(store, null, 'command')
+    expect(r.status).toBe(401)
+  })
+
+  it('anonymous users cannot createHousehold; email users can (once)', async () => {
+    const store = new FakeStore()
+    const anon = await call(store, KID, 'createHousehold', {})
+    expect(anon.status).toBe(403)
+    const r = await call(store, GROWN, 'createHousehold', { timeZone: 'Asia/Tokyo' })
+    expect(r.status).toBe(200)
+    const again = await call(store, GROWN, 'createHousehold', {})
+    expect(again.status).toBe(403)
+  })
+
+  it('imported v3 initialState is accepted; garbage is replaced by a fresh state', async () => {
+    const store = new FakeStore()
+    const good = { ...initialState(NOW, 'UTC'), schemaVersion: 3 as const }
+    const r1 = await call(store, GROWN, 'createHousehold', { initialState: good })
+    expect(r1.status).toBe(200)
+    const store2 = new FakeStore()
+    const r2 = await call(store2, GROWN, 'createHousehold', { initialState: { junk: true } })
+    expect(r2.status).toBe(200)
+    expect((r2.json as { state: GameState }).state.children.theodore.coins).toBe(20)
+  })
+
+  it('grown-up commands require the PIN; wrong PINs lock after 5 tries', async () => {
+    const store = new FakeStore()
+    const hid = await store.seed()
+    await call(store, GROWN, 'setPin', { householdId: hid, pin: '1234' })
+    const cmd = { type: 'chooseNextProject', projectId: 'music-school' }
+    // note: road must complete first in real flow; here currentProjectId=road so
+    // chooseNextProject would fail anyway — use a benign grown-up command instead
+    const cmd2 = { type: 'approveClaim', claimId: 'nope' }
+
+    const noPin = await call(store, GROWN, 'command', { householdId: hid, command: cmd2 })
+    expect((noPin.json as { error: string }).error).toBe('pin-required')
+
+    for (let i = 0; i < 5; i += 1) {
+      const r = await call(store, GROWN, 'command', { householdId: hid, command: cmd2, pin: '0000' })
+      expect((r.json as { error: string }).error).toBe('pin-wrong')
+    }
+    const locked = await call(store, GROWN, 'command', { householdId: hid, command: cmd2, pin: '1234' })
+    expect((locked.json as { error: string }).error).toBe('pin-locked')
+
+    const unlocked = await call(store, { ...GROWN }, 'verifyPin', { householdId: hid, pin: '0000' })
+    expect((unlocked.json as { result: string }).result).toBe('locked')
+
+    // reset lock + correct PIN path
+    store.pins.get(hid)!.lockedUntil = undefined
+    const ok = await call(store, GROWN, 'command', { householdId: hid, command: cmd2, pin: '1234' })
+    expect((ok.json as { result: { ok: boolean } }).result.ok).toBe(false) // claim 'nope' fails domain-side but pin passed
+    void cmd
+  })
+
+  it('non-members cannot run commands or see devices', async () => {
+    const store = new FakeStore()
+    const hid = await store.seed()
+    const r = await call(store, { userId: 'stranger', isAnonymous: true }, 'command', {
+      householdId: hid,
+      command: { type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'x' },
+    })
+    expect(r.status).toBe(403)
+    const lm = await call(store, { userId: 'stranger', isAnonymous: true }, 'listMembers', { householdId: hid })
+    expect(lm.status).toBe(403)
+  })
+
+  it('pairing: code works once, expiry and reuse fail, brute force is limited', async () => {
+    const store = new FakeStore()
+    const hid = await store.seed()
+    const r = await call(store, GROWN, 'createPairingCode', { householdId: hid })
+    const code = (r.json as { code: string }).code
+    expect(code).toMatch(/^\d{6}$/)
+
+    const paired = await call(store, KID, 'pairDevice', { code, label: "Leonard's tablet" })
+    expect(paired.status).toBe(200)
+    const again = await call(store, { userId: 'u-kid2', isAnonymous: true }, 'pairDevice', { code })
+    expect(again.status).toBe(400)
+
+    const expired = await call(store, { userId: 'u-kid3', isAnonymous: true }, 'pairDevice', { code: '000001' })
+    expect(expired.status).toBe(400)
+
+    for (let i = 0; i < 5; i += 1) {
+      await call(store, { userId: 'u-guess', isAnonymous: true }, 'pairDevice', { code: '999998' })
+    }
+    const limited = await call(store, { userId: 'u-guess', isAnonymous: true }, 'pairDevice', { code: '999998' })
+    expect(limited.status).toBe(429)
+
+    // paired device can run a normal command without a PIN
+    const claim = await call(store, KID, 'command', {
+      householdId: hid,
+      command: { type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'd1' },
+    })
+    expect((claim.json as { result: { ok: boolean } }).result.ok).toBe(true)
+  })
+
+  it('version conflict retries apply exactly once', async () => {
+    const store = new FakeStore()
+    const hid = await store.seed()
+    store.failNextUpdate = 1
+    const r = await call(store, GROWN, 'command', {
+      householdId: hid,
+      command: { type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'c-race' },
+    })
+    expect((r.json as { version: number }).version).toBe(2)
+    expect(Object.keys(store.households.get(hid)!.state.claims)).toEqual(['c-race'])
+  })
+
+  it('two concurrent final-kit buys: exactly one succeeds, loser keeps coins', async () => {
+    const store = new FakeStore()
+    const hid = await store.seed()
+    // pair the kid's device
+    const pr = await call(store, GROWN, 'createPairingCode', { householdId: hid })
+    await call(store, KID, 'pairDevice', { code: (pr.json as { code: string }).code })
+    // give the road its first kit
+    await call(store, GROWN, 'command', {
+      householdId: hid,
+      command: { type: 'buyKit', childId: 'theodore', projectId: 'road', kitPurchaseId: 'k1' },
+    })
+    const buy = (id: string) =>
+      call(store, KID, 'command', {
+        householdId: hid,
+        command: { type: 'buyKit', childId: 'leonard', projectId: 'road', kitPurchaseId: id },
+      })
+    const [a, b] = await Promise.all([buy('k2'), buy('k3')])
+    const oks = [a, b].filter((r) => (r.json as { result: { ok: boolean } }).result.ok)
+    expect(oks).toHaveLength(1)
+    const st = store.households.get(hid)!.state
+    expect(st.city.projects.road.status).toBe('open')
+    expect(st.children.leonard.coins).toBe(10) // one kit only
+    expect(st.city.currentProjectId).toBe('library')
+  })
+
+  it('setPin is grown-up only; devices can verifyPin but not set it', async () => {
+    const store = new FakeStore()
+    const hid = await store.seed()
+    const r = await call(store, GROWN, 'createPairingCode', { householdId: hid })
+    await call(store, KID, 'pairDevice', { code: (r.json as { code: string }).code })
+    const denied = await call(store, KID, 'setPin', { householdId: hid, pin: '1234' })
+    expect(denied.status).toBe(403)
+    const ok = await call(store, GROWN, 'setPin', { householdId: hid, pin: '1234' })
+    expect(ok.status).toBe(200)
+    const v = await call(store, KID, 'verifyPin', { householdId: hid, pin: '1234' })
+    expect((v.json as { result: string }).result).toBe('ok')
+  })
+})

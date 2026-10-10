@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { applyCommand, claimQuest } from './commands'
-import { initialState, localDateKey } from './state'
-import { pendingClaims, todayQuestsFor } from './selectors'
-import type { CommandDeps, GameState } from './types'
-import { commandDeps } from '../data/registry'
-import { questsFor } from '../data/quests'
+import { applyCommand, claimQuest } from './commands.ts'
+import { initialState } from './state.ts'
+import { localDateKey } from './week.ts'
+import { pendingClaims, todayQuestsFor } from './selectors.ts'
+import type { CommandDeps, GameState } from './types.ts'
+import { commandDeps } from '../data/registry.ts'
+import { questsFor } from '../data/quests.ts'
 
 const deps: CommandDeps = commandDeps
-const NOW = new Date('2026-10-10T10:00:00')
-const TODAY = localDateKey(NOW)
+const NOW = new Date('2026-10-10T10:00:00Z')
+const TODAY = localDateKey(NOW, 'UTC')
 
 function run(state: GameState, cmd: Parameters<typeof applyCommand>[1], now: Date = NOW) {
   return applyCommand(state, cmd, now, deps)
@@ -86,7 +87,7 @@ describe('claim → approve', () => {
   it('delayed approval keeps the original activityDate', () => {
     let s = initialState(NOW)
     s = run(s, { type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'c1' }).state
-    const later = new Date('2026-10-12T09:00:00')
+    const later = new Date('2026-10-12T09:00:00Z')
     const approved = run(s, { type: 'approveClaim', claimId: 'c1' }, later)
     expect(approved.result.ok).toBe(true)
     s = approved.state
@@ -192,12 +193,4 @@ describe('selectors', () => {
     expect(pendingClaims(s)).toHaveLength(0)
   })
 
-  it('setParentPin stores a hash, never the pin', () => {
-    const s0 = initialState(NOW)
-    const { state: s, result } = run(s0, { type: 'setParentPin', pin: '1234', pinHash: 'sha256-deadbeef' })
-    expect(result.ok).toBe(true)
-    expect(s.parentPinHash).toBe('sha256-deadbeef')
-    const bad = run(s, { type: 'setParentPin', pin: '12' })
-    expect(bad.result.ok).toBe(false)
-  })
 })

@@ -80,14 +80,15 @@ export interface CityState {
 }
 
 export interface GameState {
-  schemaVersion: 3
+  schemaVersion: 4
   /** ISO timestamp of when this save was first created. */
   createdAt: string
+  /** IANA time zone the family lives in — all activity dates/weeks are local to it. */
+  timeZone: string
   children: Record<ChildId, ChildState>
   claims: Record<string, Claim>
   purchases: Record<string, Purchase>
   ledger: LedgerEntry[]
-  parentPinHash: string | null
   /** Per-device settings. */
   settings: { sound: boolean }
   city: CityState
@@ -109,7 +110,6 @@ export type Command =
   | { type: 'purchase'; childId: ChildId; itemId: string; purchaseId: string }
   | { type: 'equip'; childId: ChildId; slot: EquipSlot; itemId: string | null }
   | { type: 'setWish'; childId: ChildId; itemId: string | null }
-  | { type: 'setParentPin'; pin: string; pinHash?: string }
   | { type: 'evaluateLeagues' }
   | { type: 'acknowledgePromotion'; childId: ChildId }
   | { type: 'setSound'; enabled: boolean }
@@ -149,8 +149,6 @@ export interface CommandDeps {
   getItem: (itemId: string) => CatalogItem | undefined
   /** Town project def (kits required); undefined for unknown ids. */
   getProject: (projectId: string) => { id: ProjectId; kits: number } | undefined
-  /** Sync hasher for PINs. The UI passes a pre-computed crypto.subtle SHA-256 in cmd.pinHash. */
-  hashPin: (pin: string) => string
 }
 
 /** Quest reward — same for every quest in Stage 1. */

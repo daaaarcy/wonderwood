@@ -34,6 +34,7 @@ interface RenderedProject {
 }
 
 export class TownScene extends Phaser.Scene {
+  private bg!: Phaser.GameObjects.Image
   private explorers = {} as Record<ChildId, Phaser.GameObjects.Container>
   private explorerHats = {} as Record<ChildId, Phaser.GameObjects.Image | null>
   private rendered = new Map<ProjectId, RenderedProject>()
@@ -70,7 +71,11 @@ export class TownScene extends Phaser.Scene {
   }
 
   create() {
-    this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'town-bg').setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+    this.bg = this.add
+      .image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'town-bg')
+      .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+    this.scale.on('resize', this.layout, this)
+    this.layout()
 
     // plots: fixed-position containers; art rebuilt when state changes
     for (const def of PROJECTS) {
@@ -96,6 +101,15 @@ export class TownScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.DESTROY, detach)
 
     EventBus.emit('scene-ready', 'TownScene')
+  }
+
+  /** Cover-fit the backdrop and keep the world centered at any canvas size. */
+  private layout() {
+    const w = this.scale.width
+    const h = this.scale.height
+    const s = Math.max(w / GAME_WIDTH, h / GAME_HEIGHT)
+    this.bg.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2).setDisplaySize(GAME_WIDTH * s, GAME_HEIGHT * s)
+    this.cameras.main.centerOn(GAME_WIDTH / 2, GAME_HEIGHT / 2)
   }
 
   override update(_time: number, delta: number) {

@@ -1,7 +1,6 @@
-import { localDateKey } from './state'
-import { addDays, eligibleDays, mondayKey, parseDateKey } from './week'
-import { projectById } from '../data/city'
-import type { ChildId, GameState, ProjectId } from './types'
+import { addDaysKey, eligibleDays, localDateKey, mondayKeyOf } from './week.ts'
+import { projectById } from '../data/city.ts'
+import type { ChildId, GameState, ProjectId } from './types.ts'
 
 export type QuestStatus = 'available' | 'pending' | 'done'
 
@@ -21,7 +20,7 @@ export function todayQuestsFor(
   questIds: string[],
   now: Date,
 ): TodayQuest[] {
-  const day = localDateKey(now)
+  const day = localDateKey(now, state.timeZone)
   return questIds.map((questId) => {
     const claim = Object.values(state.claims).find(
       (c) =>
@@ -95,9 +94,9 @@ export interface LeagueWeekStatus {
 
 /** Live status for the in-progress week shown on the League screen. */
 export function leagueWeekStatus(state: GameState, childId: ChildId, now: Date): LeagueWeekStatus {
-  const week = mondayKey(now)
-  const createdKey = localDateKey(new Date(state.createdAt))
-  const sunday = localDateKey(addDays(parseDateKey(week), 6))
+  const week = mondayKeyOf(localDateKey(now, state.timeZone))
+  const createdKey = localDateKey(new Date(state.createdAt), state.timeZone)
+  const sunday = addDaysKey(week, 6)
   // Eligibility as it will stand at week's end (days ≥ createdAt, ≤ Sunday).
   const days = eligibleDays(week, createdKey, sunday)
   const claims = Object.values(state.claims).filter(

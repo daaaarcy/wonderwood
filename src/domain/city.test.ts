@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { applyCommand, GROWN_UP_COMMANDS } from './commands'
-import { initialState } from './state'
-import { projectView } from './selectors'
-import { commandDeps } from '../data/registry'
-import { KIT_PRICE } from '../data/city'
+import { applyCommand, GROWN_UP_COMMANDS } from './commands.ts'
+import { initialState } from './state.ts'
+import { projectView } from './selectors.ts'
+import { commandDeps } from '../data/registry.ts'
+import { KIT_PRICE } from '../data/city.ts'
 
 const NOW = new Date('2026-10-10T10:00:00')
 const run = (s: Parameters<typeof applyCommand>[0], c: Parameters<typeof applyCommand>[1]) =>
@@ -164,7 +164,7 @@ describe('projectView stages', () => {
 
 describe('GROWN_UP_COMMANDS', () => {
   it('includes the grown-up-only command set', () => {
-    for (const t of ['approveClaim', 'rejectClaim', 'parentCompleteAndApprove', 'setParentPin', 'chooseNextProject'] as const) {
+    for (const t of ['approveClaim', 'rejectClaim', 'parentCompleteAndApprove', 'chooseNextProject'] as const) {
       expect(GROWN_UP_COMMANDS.has(t)).toBe(true)
     }
     expect(GROWN_UP_COMMANDS.has('buyKit')).toBe(false)

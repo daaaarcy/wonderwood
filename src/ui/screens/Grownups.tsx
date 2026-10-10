@@ -1,11 +1,10 @@
-import { useState } from 'react'
-import { localDateKey } from '../../domain/state'
+import { useCallback, useEffect, useState } from 'react'
+import { localDateKey } from '../../domain/week'
 import { pendingClaims, todayQuestsFor } from '../../domain/selectors'
 import { CHILD_LIST } from '../../data/children'
 import { questById, questsFor } from '../../data/quests'
 import { assetUrl } from '../../game/assets'
 import { useGameState, useRepository } from '../../storage/hooks'
-import { sha256Hex } from '../../storage/pin'
 import { LeagueBadge } from '../components/LeagueBadge'
 import { leagueTitle } from '../../data/leagues'
 import { PROJECTS, projectById } from '../../data/city'
@@ -15,48 +14,52 @@ type PinStage = 'set' | 'confirm' | 'enter'
 export function Grownups({ onExit }: { onExit: () => void }) {
   const state = useGameState()
   const repo = useRepository()
-  const [unlocked, setUnlocked] = useState(false)
-  const defaultStage: PinStage = state.parentPinHash ? 'enter' : 'set'
-  const [stage, setStage] = useState<{ hash: string | null; stage: PinStage }>({
-    hash: state.parentPinHash,
-    stage: defaultStage,
-  })
+  const gate = repo.gate
+  const [unlockedPin, setUnlockedPin] = useState<string | null>(null)
+  const [stage, setStage] = useState<{ ready: boolean; stage: PinStage }>({ ready: false, stage: 'set' })
   const [firstPin, setFirstPin] = useState('')
   const [entry, setEntry] = useState('')
   const [error, setError] = useState('')
 
-  // Re-sync the PIN stage if the stored hash changes while this screen is open.
-  if (stage.hash !== state.parentPinHash) {
-    setStage({ hash: state.parentPinHash, stage: defaultStage })
-    setEntry('')
-    setFirstPin('')
-  }
+  useEffect(() => {
+    let live = true
+    void gate.hasPin().then((has) => {
+      if (live) setStage({ ready: true, stage: has ? 'enter' : 'set' })
+    })
+    return () => {
+      live = false
+    }
+  }, [gate])
+
   const pinStage = stage.stage
+  const unlocked = unlockedPin !== null
 
   const submitPin = async (pin: string) => {
     setError('')
     if (pinStage === 'set') {
       setFirstPin(pin)
-      setStage({ hash: state.parentPinHash, stage: 'confirm' })
+      setStage({ ready: true, stage: 'confirm' })
       setEntry('')
       return
     }
     if (pinStage === 'confirm') {
       if (pin !== firstPin) {
         setError('Those PINs did not match — try again.')
-        setStage({ hash: state.parentPinHash, stage: 'set' })
+        setStage({ ready: true, stage: 'set' })
         setFirstPin('')
         setEntry('')
         return
       }
-      const pinHash = await sha256Hex(pin)
-      void repo.dispatch({ type: 'setParentPin', pin, pinHash })
-      setUnlocked(true)
+      await gate.setPin(pin)
+      setUnlockedPin(pin)
       return
     }
-    const pinHash = await sha256Hex(pin)
-    if (pinHash === state.parentPinHash) {
-      setUnlocked(true)
+    const result = await gate.verify(pin)
+    if (result === 'ok') {
+      setUnlockedPin(pin)
+    } else if (result === 'locked') {
+      setError('Too many tries — take a little break and come back soon.')
+      setEntry('')
     } else {
       setError('Not quite — try again.')
       setEntry('')
@@ -74,6 +77,7 @@ export function Grownups({ onExit }: { onExit: () => void }) {
   }
 
   if (!unlocked) {
+    if (!stage.ready) return <div className="screen grownups-screen" />
     return (
       <div className="screen grownups-screen">
         <h2 className="screen-title">Grown-ups</h2>
@@ -105,14 +109,14 @@ export function Grownups({ onExit }: { onExit: () => void }) {
           )}
         </div>
         <button className="btn btn-ghost" onClick={onExit}>
-          Back to the island
+          Back to the explorers
         </button>
       </div>
     )
   }
 
   const pending = pendingClaims(state)
-  const today = localDateKey(new Date())
+  const today = localDateKey(new Date(), state.timeZone)
 
   return (
     <div className="screen grownups-screen">
@@ -135,13 +139,13 @@ export function Grownups({ onExit }: { onExit: () => void }) {
                 <div className="claim-actions">
                   <button
                     className="btn btn-yes"
-                    onClick={() => void repo.dispatch({ type: 'approveClaim', claimId: claim.id })}
+                    onClick={() => void repo.dispatch({ type: 'approveClaim', claimId: claim.id }, { pin: unlockedPin ?? undefined })}
                   >
                     Approve
                   </button>
                   <button
                     className="btn btn-ghost"
-                    onClick={() => void repo.dispatch({ type: 'rejectClaim', claimId: claim.id })}
+                    onClick={() => void repo.dispatch({ type: 'rejectClaim', claimId: claim.id }, { pin: unlockedPin ?? undefined })}
                   >
                     Not yet
                   </button>
@@ -181,7 +185,7 @@ export function Grownups({ onExit }: { onExit: () => void }) {
                 <div className="claim-actions">
                   <button
                     className="btn btn-yes"
-                    onClick={() => void repo.dispatch({ type: 'chooseNextProject', projectId: p.id })}
+                    onClick={() => void repo.dispatch({ type: 'chooseNextProject', projectId: p.id }, { pin: unlockedPin ?? undefined })}
                   >
                     Build this next
                   </button>
@@ -192,8 +196,26 @@ export function Grownups({ onExit }: { onExit: () => void }) {
         </section>
       )}
 
+      {repo.devices && (
+        <section className="panel" aria-label="Devices">
+          <h3>Devices</h3>
+          <DevicesSection devices={repo.devices} />
+        </section>
+      )}
+
       <section className="panel settings-panel">
         <h3>Settings</h3>
+        <button
+          className="btn btn-neutral"
+          onClick={() => {
+            setUnlockedPin(null)
+            setStage({ ready: true, stage: 'set' })
+            setFirstPin('')
+            setEntry('')
+          }}
+        >
+          Change PIN
+        </button>
         <label className="sound-toggle">
           <span>Sound</span>
           <button
@@ -237,12 +259,15 @@ export function Grownups({ onExit }: { onExit: () => void }) {
                         <button
                           className="btn btn-yes"
                           onClick={() =>
-                            void repo.dispatch({
-                              type: 'parentCompleteAndApprove',
-                              childId: child.id,
-                              questId: quest.id,
-                              claimId: `parent:${child.id}:${quest.id}:${today}`,
-                            })
+                            void repo.dispatch(
+                              {
+                                type: 'parentCompleteAndApprove',
+                                childId: child.id,
+                                questId: quest.id,
+                                claimId: `parent:${child.id}:${quest.id}:${today}`,
+                              },
+                              { pin: unlockedPin ?? undefined },
+                            )
                           }
                         >
                           Done &amp; approve
@@ -267,5 +292,86 @@ export function Grownups({ onExit }: { onExit: () => void }) {
         Done — back to explorers
       </button>
     </div>
+  )
+}
+
+
+interface DeviceApis {
+  list(): Promise<{ userId: string; role: string; label: string | null }[]>
+  createPairingCode(): Promise<{ code: string; expiresAt: string }>
+  remove(userId: string): Promise<void>
+}
+
+function DevicesSection({ devices }: { devices: DeviceApis }) {
+  const [members, setMembers] = useState<{ userId: string; role: string; label: string | null }[] | null>(null)
+  const [code, setCode] = useState<{ code: string; expiresAt: string } | null>(null)
+  const [secsLeft, setSecsLeft] = useState(0)
+  const [error, setError] = useState('')
+
+  const refresh = useCallback(() => {
+    devices
+      .list()
+      .then(setMembers)
+      .catch(() => setError('Could not load devices.'))
+  }, [devices])
+
+  useEffect(refresh, [refresh])
+
+  useEffect(() => {
+    if (!code) return
+    const tick = () => setSecsLeft(Math.max(0, Math.round((new Date(code.expiresAt).getTime() - Date.now()) / 1000)))
+    tick()
+    const t = setInterval(tick, 1000)
+    return () => clearInterval(t)
+  }, [code])
+
+  const addDevice = async () => {
+    try {
+      setCode(await devices.createPairingCode())
+    } catch {
+      setError('Could not make a code — try again.')
+    }
+  }
+
+  return (
+    <>
+      <ul className="claim-list">
+        {(members ?? []).map((m) => (
+          <li key={m.userId} className="claim-row">
+            <div className="claim-info">
+              <span>
+                {m.role === 'grown_up' ? 'Grown-up phone' : (m.label ?? 'Kids device')}
+                {m.role === 'grown_up' && <span className="tag">Grown-up</span>}
+              </span>
+            </div>
+            {m.role !== 'grown_up' && (
+              <div className="claim-actions">
+                <button
+                  className="btn btn-neutral"
+                  onClick={() => void devices.remove(m.userId).then(refresh).catch(() => setError('Could not remove.'))}
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+      {error && <p className="form-error">{error}</p>}
+      {code ? (
+        <div className="pairing-code">
+          <p className="muted">On the kids’ device, tap “This is a kids’ device” and enter:</p>
+          <p className="pairing-digits">{code.code}</p>
+          <p className="muted">{secsLeft > 0 ? `Good for ${Math.ceil(secsLeft / 60)} more min` : 'Expired — make a new one'}</p>
+          <button className="btn btn-neutral" onClick={() => { setCode(null); refresh() }}>
+            Done
+          </button>
+        </div>
+      ) : (
+        <button className="btn" onClick={() => void addDevice()}>
+          Add a device
+        </button>
+      )}
+    </>
   )
 }

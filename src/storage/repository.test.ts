@@ -32,7 +32,7 @@ describe('LocalStorageRepository', () => {
     const storage = new FakeStorage()
     const repo = new LocalStorageRepository(storage, commandDeps)
     const s = repo.load()
-    expect(s.schemaVersion).toBe(3)
+    expect(s.schemaVersion).toBe(4)
     expect(s.children.theodore.coins).toBe(20)
     expect(s.city.currentProjectId).toBe('road')
     expect(s.city.projects.road.status).toBe('building')
@@ -66,7 +66,7 @@ describe('LocalStorageRepository', () => {
     const storage = new FakeStorage()
     storage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 99, children: {} }))
     const repo = new LocalStorageRepository(storage, commandDeps)
-    expect(repo.load().schemaVersion).toBe(3)
+    expect(repo.load().schemaVersion).toBe(4)
     expect(storage.dump().some((k) => k.includes('corrupt'))).toBe(true)
   })
 
@@ -128,7 +128,7 @@ describe('LocalStorageRepository', () => {
     expect(stored.city.projects.road.kits).toBe(2)
   })
 
-  it('migrates a v1 save to v3 without the corrupt-backup path', () => {
+  it('migrates a v1 save to v4 without the corrupt-backup path', () => {
     const storage = new FakeStorage()
     const v1 = {
       schemaVersion: 1,
@@ -147,14 +147,13 @@ describe('LocalStorageRepository', () => {
     storage.setItem(STORAGE_KEY, JSON.stringify(v1))
     const repo = new LocalStorageRepository(storage, commandDeps)
     const s = repo.load()
-    expect(s.schemaVersion).toBe(3)
+    expect(s.schemaVersion).toBe(4)
     expect(s.createdAt).toBe('2026-09-01T08:00:00.000Z') // earliest ledger entry
     expect(s.children.theodore.coins).toBe(33)
     expect(s.children.theodore.inventory).toContain('hat-leaf')
     expect(s.children.theodore.league.rank).toBe(1)
     expect(s.children.theodore.league.evaluatedWeeks).toEqual({})
     expect(s.settings.sound).toBe(true)
-    expect(s.parentPinHash).toBe('abc123')
     // city: fresh town + founders' keepsake (2 stars → 2 planks)
     expect(s.city.currentProjectId).toBe('road')
     expect(s.city.foundersBridgePlanks).toBe(2)
@@ -162,7 +161,7 @@ describe('LocalStorageRepository', () => {
     expect(storage.dump().some((k) => k.includes('corrupt'))).toBe(false)
   })
 
-  it('migrates a v2 save to v3 and freezes the star-bridge as a keepsake', () => {
+  it('migrates a v2 save to v4 and freezes the star-bridge as a keepsake', () => {
     const storage = new FakeStorage()
     const child = (coins: number, stars: number) => ({
       coins,
@@ -187,7 +186,7 @@ describe('LocalStorageRepository', () => {
     storage.setItem(STORAGE_KEY, JSON.stringify(v2))
     const repo = new LocalStorageRepository(storage, commandDeps)
     const s = repo.load()
-    expect(s.schemaVersion).toBe(3)
+    expect(s.schemaVersion).toBe(4)
     expect(s.children.theodore.coins).toBe(45)
     expect(s.children.theodore.league.rank).toBe(3)
     expect(s.children.theodore.league.evaluatedWeeks['2026-10-05']).toEqual({ promoted: true })
@@ -212,5 +211,44 @@ describe('LocalStorageRepository', () => {
     unsub()
     await repo.dispatch({ type: 'approveClaim', claimId: 'c1' })
     expect(calls).toBe(1)
+  })
+
+  it('migrates a v3 save to v4: drops parentPinHash, stamps the local time zone', () => {
+    const storage = new FakeStorage()
+    const child = (coins: number, stars: number) => ({
+      coins, stars, inventory: ['toy-train'], equipped: { hat: null, toy: 'toy-train' },
+      wishItem: null,
+      league: { rank: 2, evaluatedWeeks: {}, unseenPromotion: null },
+    })
+    const v3 = {
+      schemaVersion: 3,
+      createdAt: '2026-10-05T09:00:00.000Z',
+      children: { theodore: child(30, 4), leonard: child(20, 3) },
+      claims: {}, purchases: {}, ledger: [], parentPinHash: 'sha256-xyz',
+      settings: { sound: true },
+      city: {
+        currentProjectId: 'library', suggestedProjectId: null,
+        projects: {
+          road: { kits: 2, status: 'open', openedAt: '2026-10-06T00:00:00.000Z' },
+          library: { kits: 0, status: 'building' },
+          'music-school': { kits: 0, status: 'locked' },
+          'police-station': { kits: 0, status: 'locked' },
+          hospital: { kits: 0, status: 'locked' },
+        },
+        kitPurchases: {}, foundersBridgePlanks: 7,
+      },
+    }
+    storage.setItem(STORAGE_KEY, JSON.stringify(v3))
+    const repo = new LocalStorageRepository(storage, commandDeps)
+    const s = repo.load()
+    expect(s.schemaVersion).toBe(4)
+    expect('parentPinHash' in s).toBe(false)
+    expect(typeof s.timeZone).toBe('string')
+    expect(s.timeZone.length).toBeGreaterThan(0)
+    // city survives untouched
+    expect(s.city.foundersBridgePlanks).toBe(7)
+    expect(s.city.projects.road.status).toBe('open')
+    expect(s.city.currentProjectId).toBe('library')
+    expect(storage.dump().some((k) => k.includes('corrupt'))).toBe(false)
   })
 })

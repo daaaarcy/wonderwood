@@ -3,7 +3,7 @@
  * One Building Kit = a box of supplies (never a currency): it costs
  * KIT_PRICE coins and goes straight into the current shared project.
  */
-import type { ChildId, ProjectId } from '../domain/types'
+import type { ChildId, ProjectId } from '../domain/types.ts'
 
 export const KIT_PRICE = 10
 

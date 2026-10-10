@@ -1,4 +1,4 @@
-import type { ChildId } from '../domain/types'
+import type { ChildId } from '../domain/types.ts'
 
 export interface ChildDef {
   id: ChildId

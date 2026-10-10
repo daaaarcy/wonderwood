@@ -6,3 +6,6 @@ playwright-report/
 test-results/
 *.local
 .DS_Store
+
+# synced copies of src/domain + src/data for Deno bundling
+supabase/functions/_shared/

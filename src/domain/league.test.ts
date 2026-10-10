@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { applyCommand, approveClaim, claimQuest } from './commands'
-import { initialState } from './state'
-import { leagueWeekStatus } from './selectors'
-import type { CommandDeps, GameState } from './types'
-import { commandDeps } from '../data/registry'
-import { questsFor } from '../data/quests'
+import { applyCommand, approveClaim, claimQuest } from './commands.ts'
+import { initialState } from './state.ts'
+import { leagueWeekStatus } from './selectors.ts'
+import type { CommandDeps, GameState } from './types.ts'
+import { commandDeps } from '../data/registry.ts'
+import { questsFor } from '../data/quests.ts'
 
 const deps: CommandDeps = commandDeps
 
 const MONDAY_W0 = '2026-09-07' // week containing Mon Sep 7 → Sun Sep 13
 const MONDAY_W1 = '2026-09-14'
-const NOW_W1 = new Date('2026-09-14T10:00:00') // Monday of W1
-const NOW_W2 = new Date('2026-09-21T10:00:00')
+const NOW_W1 = new Date('2026-09-14T10:00:00Z') // Monday of W1
+const NOW_W2 = new Date('2026-09-21T10:00:00Z')
 
 function claimAndApprove(s: GameState, day: Date, n: number, questOffset = 0): GameState {
   let next = s
@@ -37,7 +37,7 @@ function weekOfApprovals(
   let next = s
   const [y, m, d] = mondayIso.split('-').map(Number)
   for (let i = 0; i < days; i += 1) {
-    next = claimAndApprove(next, new Date(y, m - 1, d + dayOffset + i, 10), perDay, questOffset)
+    next = claimAndApprove(next, new Date(Date.UTC(y, m - 1, d + dayOffset + i, 10)), perDay, questOffset)
   }
   return next
 }
@@ -49,7 +49,7 @@ function eval_(s: GameState, now: Date) {
 describe('league promotion rule', () => {
   it('15 of 21 (exactly 70% threshold, ≥3 days) promotes one league', () => {
     // createdAt before the week → full 7 eligible days → target ceil(0.7*21)=15
-    let s = initialState(new Date('2026-09-01T08:00:00'))
+    let s = initialState(new Date('2026-09-01T08:00:00Z'))
     s = weekOfApprovals(s, MONDAY_W0, 5, 3) // 15 over 5 days
     s = eval_(s, NOW_W1)
     const league = s.children.theodore.league
@@ -62,7 +62,7 @@ describe('league promotion rule', () => {
   })
 
   it('14 of 21 does not promote', () => {
-    let s = initialState(new Date('2026-09-01T08:00:00'))
+    let s = initialState(new Date('2026-09-01T08:00:00Z'))
     s = weekOfApprovals(s, MONDAY_W0, 5, 2) // 10 over Mon–Fri
     s = weekOfApprovals(s, MONDAY_W0, 2, 2, 5, 2) // +4 on Sat/Sun (quests[2],[0]) = 14 over 7 days
     s = eval_(s, NOW_W1)
@@ -72,17 +72,17 @@ describe('league promotion rule', () => {
   })
 
   it('createdAt Saturday → 2 eligible days → rest week, no promotion', () => {
-    let s = initialState(new Date('2026-09-12T08:00:00')) // Saturday of W0
+    let s = initialState(new Date('2026-09-12T08:00:00Z')) // Saturday of W0
     // even 6 approvals in 2 days can't promote
-    s = claimAndApprove(s, new Date('2026-09-12T10:00:00'), 3)
-    s = claimAndApprove(s, new Date('2026-09-13T10:00:00'), 3)
+    s = claimAndApprove(s, new Date('2026-09-12T10:00:00Z'), 3)
+    s = claimAndApprove(s, new Date('2026-09-13T10:00:00Z'), 3)
     s = eval_(s, NOW_W1)
     expect(s.children.theodore.league.rank).toBe(1)
     expect(s.children.theodore.league.evaluatedWeeks[MONDAY_W0]).toEqual({ promoted: false })
   })
 
   it('createdAt Wednesday → 5 eligible days, target 11 of 15 over ≥3 days', () => {
-    let s = initialState(new Date('2026-09-09T08:00:00')) // Wednesday of W0
+    let s = initialState(new Date('2026-09-09T08:00:00Z')) // Wednesday of W0
     // 10 approvals → below 11 → no promotion
     s = weekOfApprovals(s, '2026-09-09', 4, 2) // 8 over Wed–Sat
     s = weekOfApprovals(s, '2026-09-09', 1, 2, 4) // Sun +2 → 10 total
@@ -90,15 +90,15 @@ describe('league promotion rule', () => {
     expect(s.children.theodore.league.rank).toBe(1)
 
     // Now 11 approvals over ≥3 days
-    let s2 = initialState(new Date('2026-09-09T08:00:00'))
+    let s2 = initialState(new Date('2026-09-09T08:00:00Z'))
     s2 = weekOfApprovals(s2, '2026-09-09', 3, 3) // 9 over Wed–Fri
-    s2 = claimAndApprove(s2, new Date('2026-09-12T10:00:00'), 2, 2) // Sat +2 (quests[2],[0]) → 11
+    s2 = claimAndApprove(s2, new Date('2026-09-12T10:00:00Z'), 2, 2) // Sat +2 (quests[2],[0]) → 11
     s2 = eval_(s2, NOW_W1)
     expect(s2.children.theodore.league.rank).toBe(2)
   })
 
   it('is idempotent — evaluating twice changes nothing', () => {
-    let s = initialState(new Date('2026-09-01T08:00:00'))
+    let s = initialState(new Date('2026-09-01T08:00:00Z'))
     s = weekOfApprovals(s, MONDAY_W0, 5, 3)
     const once = eval_(s, NOW_W1)
     const twice = eval_(once, NOW_W1)
@@ -106,7 +106,7 @@ describe('league promotion rule', () => {
   })
 
   it('multi-week catch-up promotes once per qualifying week, keeps original from', () => {
-    let s = initialState(new Date('2026-09-01T08:00:00'))
+    let s = initialState(new Date('2026-09-01T08:00:00Z'))
     s = weekOfApprovals(s, MONDAY_W0, 5, 3) // W0 qualifies
     s = weekOfApprovals(s, MONDAY_W1, 5, 3) // W1 qualifies
     s = eval_(s, NOW_W2)
@@ -118,7 +118,7 @@ describe('league promotion rule', () => {
   })
 
   it('caps at rank 14', () => {
-    let s = initialState(new Date('2026-09-01T08:00:00'))
+    let s = initialState(new Date('2026-09-01T08:00:00Z'))
     s = {
       ...s,
       children: {
@@ -134,15 +134,15 @@ describe('league promotion rule', () => {
   })
 
   it('late approval of a prior-week claim promotes after re-check', () => {
-    let s = initialState(new Date('2026-09-01T08:00:00'))
+    let s = initialState(new Date('2026-09-01T08:00:00Z'))
     s = weekOfApprovals(s, MONDAY_W0, 4, 3) // 12 over Mon–Thu
-    s = claimAndApprove(s, new Date('2026-09-12T10:00:00'), 2) // 14 (Fri was skipped, Sat ×2)
+    s = claimAndApprove(s, new Date('2026-09-12T10:00:00Z'), 2) // 14 (Fri was skipped, Sat ×2)
     // wait: Sat uses default offset quests[0],[1] — distinct day so fine
     // one more claim left PENDING in W0
     const pending = claimQuest(
       s,
       { childId: 'theodore', questId: 'theodore-kindness', claimId: 'late-1' },
-      new Date('2026-09-12T11:00:00'),
+      new Date('2026-09-12T11:00:00Z'),
       deps,
     )
     s = pending.state
@@ -156,23 +156,23 @@ describe('league promotion rule', () => {
   })
 
   it('purchases never change league rank', () => {
-    let s = initialState(new Date('2026-09-01T08:00:00'))
+    let s = initialState(new Date('2026-09-01T08:00:00Z'))
     s = applyCommand(s, { type: 'purchase', childId: 'theodore', itemId: 'hat-leaf', purchaseId: 'p1' }, NOW_W1, deps).state
     expect(s.children.theodore.league.rank).toBe(1)
   })
 
   it('pending and rejected claims do not count', () => {
-    let s = initialState(new Date('2026-09-01T08:00:00'))
+    let s = initialState(new Date('2026-09-01T08:00:00Z'))
     // 12 approved + 3 pending + 3 rejected in W0
     s = weekOfApprovals(s, MONDAY_W0, 4, 3)
     const q = questsFor('theodore')
     for (let i = 0; i < 3; i += 1) {
-      s = claimQuest(s, { childId: 'theodore', questId: q[i].id, claimId: `pend-${i}` }, new Date('2026-09-12T10:00:00'), deps).state
+      s = claimQuest(s, { childId: 'theodore', questId: q[i].id, claimId: `pend-${i}` }, new Date('2026-09-12T10:00:00Z'), deps).state
     }
     // rejected: claim then reject
     for (let i = 0; i < 3; i += 1) {
-      s = claimQuest(s, { childId: 'theodore', questId: q[i].id, claimId: `rej-${i}` }, new Date('2026-09-13T10:00:00'), deps).state
-      s = applyCommand(s, { type: 'rejectClaim', claimId: `rej-${i}` }, new Date('2026-09-13T11:00:00'), deps).state
+      s = claimQuest(s, { childId: 'theodore', questId: q[i].id, claimId: `rej-${i}` }, new Date('2026-09-13T10:00:00Z'), deps).state
+      s = applyCommand(s, { type: 'rejectClaim', claimId: `rej-${i}` }, new Date('2026-09-13T11:00:00Z'), deps).state
     }
     s = eval_(s, NOW_W1)
     expect(s.children.theodore.league.rank).toBe(1) // 12 < 15
@@ -181,7 +181,7 @@ describe('league promotion rule', () => {
 
 describe('parentCompleteAndApprove with an existing claim', () => {
   it('approves the child’s pending claim instead of erroring', () => {
-    let s = initialState(new Date('2026-09-14T09:00:00'))
+    let s = initialState(new Date('2026-09-14T09:00:00Z'))
     s = claimQuest(s, { childId: 'theodore', questId: 'theodore-language', claimId: 'kid-1' }, NOW_W1, deps).state
     const out = applyCommand(
       s,
@@ -198,7 +198,7 @@ describe('parentCompleteAndApprove with an existing claim', () => {
   })
 
   it('is a no-op when the quest was already approved today', () => {
-    let s = initialState(new Date('2026-09-14T09:00:00'))
+    let s = initialState(new Date('2026-09-14T09:00:00Z'))
     s = applyCommand(
       s,
       { type: 'parentCompleteAndApprove', childId: 'theodore', questId: 'theodore-language', claimId: 'parent-1' },
@@ -219,7 +219,7 @@ describe('parentCompleteAndApprove with an existing claim', () => {
 
 describe('acknowledgePromotion + leagueWeekStatus', () => {
   it('clears unseenPromotion', () => {
-    let s = initialState(new Date('2026-09-01T08:00:00'))
+    let s = initialState(new Date('2026-09-01T08:00:00Z'))
     s = weekOfApprovals(s, MONDAY_W0, 5, 3)
     s = eval_(s, NOW_W1)
     s = applyCommand(s, { type: 'acknowledgePromotion', childId: 'theodore' }, NOW_W1, deps).state
@@ -228,7 +228,7 @@ describe('acknowledgePromotion + leagueWeekStatus', () => {
   })
 
   it('reports live week progress and rest weeks', () => {
-    let s = initialState(new Date('2026-09-14T08:00:00')) // Monday W1
+    let s = initialState(new Date('2026-09-14T08:00:00Z')) // Monday W1
     // approve 2 quests on Monday
     s = claimAndApprove(s, NOW_W1, 2)
     const w = leagueWeekStatus(s, 'theodore', NOW_W1)
@@ -237,7 +237,7 @@ describe('acknowledgePromotion + leagueWeekStatus', () => {
     expect(w.count).toBe(2)
     expect(w.target).toBe(15) // ceil(0.7 * 21)
     // Saturday-created state → rest week
-    const s2 = initialState(new Date('2026-09-19T08:00:00')) // Sat of W1
-    expect(leagueWeekStatus(s2, 'theodore', new Date('2026-09-19T09:00:00')).restWeek).toBe(true)
+    const s2 = initialState(new Date('2026-09-19T08:00:00Z')) // Sat of W1
+    expect(leagueWeekStatus(s2, 'theodore', new Date('2026-09-19T09:00:00Z')).restWeek).toBe(true)
   })
 })

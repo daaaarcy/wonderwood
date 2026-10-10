@@ -8,7 +8,7 @@ import { questsFor } from '../../data/quests'
 import { assetUrl } from '../../game/assets'
 import { EventBus } from '../../game/EventBus'
 import { PhaserGame } from '../../game/PhaserGame'
-import { useGameState, useRepository } from '../../storage/hooks'
+import { useGameState, useRepository, useRepoStatus } from '../../storage/hooks'
 import { Celebration, type CelebrationData } from '../components/Celebration'
 import { PromotionOverlay } from '../components/PromotionOverlay'
 
@@ -49,6 +49,8 @@ type Sheet =
 export function ChildHome({ childId }: { childId: ChildId }) {
   const state = useGameState()
   const repo = useRepository()
+  const repoStatus = useRepoStatus()
+  const offline = repoStatus === 'offline'
   const child = state.children[childId]
   const def = CHILDREN[childId]
   const [sceneReady, setSceneReady] = useState(false)
@@ -171,6 +173,7 @@ export function ChildHome({ childId }: { childId: ChildId }) {
 
   return (
     <div className="screen home-screen" style={{ ['--accent' as string]: def.color }}>
+      {offline && <p className="offline-banner">Waiting for internet…</p>}
       <div className="home-main">
         <div className="island-wrap">
           <PhaserGame scene="town" onSceneReady={setSceneReady} />
@@ -215,7 +218,7 @@ export function ChildHome({ childId }: { childId: ChildId }) {
               </div>
               <button
                 className="btn btn-big btn-yes"
-                disabled={!canAffordKit || busy}
+                disabled={!canAffordKit || busy || offline}
                 onClick={() => setSheet({ kind: 'buy-kit' })}
               >
                 {canAffordKit

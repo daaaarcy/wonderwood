@@ -94,3 +94,35 @@ e2e/          Playwright specs. screenshots/ output is gitignored.
   hats never drift off heads. Hat attach = `headAnchor` in data + per-item
   `anchor` fraction in the catalogue.
 - `localStorage` between e2e runs is per-test-context; tests are independent.
+
+## Supabase backend (schema v4)
+
+Authoritative state lives in Postgres (`households.state`, versioned). All writes
+go through edge function `game` (`supabase/functions/game/`), which runs the same
+`applyCommand` domain code as the client. PINs live in `household_secrets`
+(bcrypt via pgcrypto), checked by `check_household_pin` — never in game state.
+
+### Env
+`.env.local` (gitignored): SUPABASE_URL (no scheme), SUPABASE_PUBLISHABLE_KEY,
+SUPABASE_SECRET_KEY, SUPABASE_ACCESS_TOKEN, VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY.
+Only the two `VITE_` vars reach the bundle; `npm run build` fails if dist leaks
+`sb_secret_`/`sbp_` material (scripts/check-secrets.mjs).
+
+### Backend mode
+`VITE_BACKEND=supabase` (default when VITE_SUPABASE_URL is set) | `local`.
+e2e builds with `VITE_BACKEND=local` so tests stay offline.
+
+### Deploy commands
+```sh
+node scripts/sync-shared.mjs        # copy src/domain + src/data → supabase/functions/_shared (gitignored; auto-ran by test/deploy/smoke)
+node scripts/db-migrate.mjs         # apply supabase/migrations/*.sql via Management API
+npm run deploy:game                 # sync + supabase functions deploy game --use-api (needs SUPABASE_ACCESS_TOKEN env)
+npm run smoke:supabase              # live end-to-end test against the real project
+node scripts/ui-smoke.mjs           # real onboarding screenshots; needs a preview: VITE_BACKEND=supabase npm run build && npm run preview -- --port 4174
+```
+Function secret for prod CORS: `APP_ORIGIN` (localhost + 127.0.0.1 dev origins are always allowed).
+
+### Notes
+- Anonymous sign-ins are enabled via Management API (external_anonymous_users_enabled).
+- Sync to other devices = realtime broadcast `household:<id>` 'update' + 20s poll + visibility/online refetch. (postgres_changes UPDATE delivery was unreliable on this project, so the function broadcasts after each successful command.)
+- Grown-up commands (GROWN_UP_COMMANDS) require a PIN server-side on every device.

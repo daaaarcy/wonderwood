@@ -1,4 +1,4 @@
-import type { CatalogItem } from '../domain/types'
+import type { CatalogItem } from '../domain/types.ts'
 
 export interface ShopItem extends CatalogItem {
   blurb: string

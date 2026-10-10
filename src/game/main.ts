@@ -13,10 +13,11 @@ export function startGame(parent: string, scene: WonderwoodScene): Phaser.Game {
     parent,
     backgroundColor: '#bfe9f8',
     render: { antialias: true },
-    scale: {
-      mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH,
-    },
+    scale:
+      scene === 'town'
+        ? // town fills whatever box it gets; the scene keeps the world centered
+          { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH }
+        : { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: scene === 'town' ? [TownScene] : [RoomScene],
   }
   return new Phaser.Game(config)

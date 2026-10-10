@@ -1,6 +1,6 @@
 import { applyCommand } from '../src/domain/commands'
 import { initialState } from '../src/domain/state'
-import { addDays, mondayKey, parseDateKey } from '../src/domain/week'
+import { addDaysKey, localDateKey, mondayKeyOf } from '../src/domain/week'
 import type { GameState, ProjectId } from '../src/domain/types'
 import { commandDeps } from '../src/data/registry'
 import { questsFor } from '../src/data/quests'
@@ -23,14 +23,13 @@ export function freshState(mutate?: (s: GameState) => void): GameState {
  */
 export function promotionSeed(): GameState {
   const now = new Date()
-  const thisMonday = parseDateKey(mondayKey(now))
-  const lastMonday = addDays(thisMonday, -7)
-  const created = addDays(thisMonday, -14)
-  let s = initialState(created)
+  const thisMonday = mondayKeyOf(localDateKey(now, 'UTC'))
+  const lastMondayKey = addDaysKey(thisMonday, -7)
+  const created = new Date(`${addDaysKey(thisMonday, -14)}T09:00:00Z`)
+  let s = initialState(created, 'UTC')
   const quests = questsFor('theodore')
   for (let d = 0; d < 5; d += 1) {
-    const day = addDays(lastMonday, d)
-    day.setHours(10, 0, 0, 0)
+    const day = new Date(`${addDaysKey(lastMondayKey, d)}T10:00:00Z`)
     for (const q of quests) {
       const claimId = `seed-${d}-${q.id}`
       s = applyCommand(s, { type: 'claimQuest', childId: 'theodore', questId: q.id, claimId }, day, commandDeps).state
@@ -45,8 +44,8 @@ export function promotionSeed(): GameState {
 export function leagueSeed(rank: number): GameState {
   return freshState((s) => {
     s.children.theodore.league.rank = rank
-    const lastMonday = addDays(parseDateKey(mondayKey(new Date())), -7)
-    s.createdAt = lastMonday.toISOString()
+    const lastMonday = addDaysKey(mondayKeyOf(localDateKey(new Date(), 'UTC')), -7)
+    s.createdAt = `${lastMonday}T09:00:00Z`
   })
 }
 

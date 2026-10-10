@@ -3,12 +3,13 @@ import type { ChildId } from '../../domain/types'
 import { CHILDREN } from '../../data/children'
 import { CATALOGUE, itemById, type ShopItem } from '../../data/catalogue'
 import { assetUrl } from '../../game/assets'
-import { useGameState, useRepository } from '../../storage/hooks'
+import { useGameState, useRepository, useRepoStatus } from '../../storage/hooks'
 import { CharacterAvatar } from '../components/CharacterAvatar'
 
 export function Shop({ childId }: { childId: ChildId }) {
   const state = useGameState()
   const repo = useRepository()
+  const offline = useRepoStatus() === 'offline'
   const child = state.children[childId]
   const def = CHILDREN[childId]
   const [selectedId, setSelectedId] = useState<string>(
@@ -43,7 +44,7 @@ export function Shop({ childId }: { childId: ChildId }) {
               <>
                 <button
                   className="btn btn-big btn-yes"
-                  disabled={needed > 0}
+                  disabled={needed > 0 || offline}
                   onClick={() =>
                     void repo.dispatch({
                       type: 'purchase',
