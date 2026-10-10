@@ -3,12 +3,14 @@ import { addDays, eligibleDays, mondayKey, parseDateKey } from './week'
 import type {
   ChildId,
   Claim,
+  CityState,
   Command,
   CommandDeps,
   CommandOutcome,
   DomainError,
   GameState,
   LedgerEntry,
+  ProjectId,
   Purchase,
   Result,
 } from './types'
@@ -444,6 +446,147 @@ export function setParentPin(
   return { state: next, result: ok(next) }
 }
 
+/* ---------------- Town building kits ---------------- */
+
+/** Kits cost this many coins — mirrors src/data/city.ts KIT_PRICE. */
+const KIT_PRICE = 10
+/** The road opening automatically starts the library. */
+const NEXT_AFTER_ROAD: ProjectId = 'library'
+
+function withCity(state: GameState, city: CityState): GameState {
+  return { ...state, city }
+}
+
+/**
+ * Buy one Building Kit and add it straight into the current shared project.
+ * Idempotent by kitPurchaseId: a re-send returns the original purchase.
+ */
+export function buyKit(
+  state: GameState,
+  cmd: { childId: ChildId; projectId: ProjectId; kitPurchaseId: string },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<CityState['kitPurchases'][string]> {
+  const existing = state.city.kitPurchases[cmd.kitPurchaseId]
+  if (existing) {
+    return { state, result: ok(existing) }
+  }
+  const project = state.city.projects[cmd.projectId]
+  const def = deps.getProject(cmd.projectId)
+  if (!project || !def) {
+    return { state, result: err('not-current-project', 'No such building project.') }
+  }
+  if (project.status === 'open') {
+    return { state, result: err('project-complete', 'That building is already open!') }
+  }
+  if (cmd.projectId !== state.city.currentProjectId || project.status !== 'building') {
+    return {
+      state,
+      result: err('not-current-project', 'That is not the building we are working on.'),
+    }
+  }
+  const child = state.children[cmd.childId]
+  if (child.coins < KIT_PRICE) {
+    const needed = KIT_PRICE - child.coins
+    return {
+      state,
+      result: err('insufficient-coins', `Need ${needed} more coin${needed === 1 ? '' : 's'}.`),
+    }
+  }
+
+  const at = now.toISOString()
+  const kits = project.kits + 1
+  const opensNow = kits >= def.kits
+
+  let city: CityState = {
+    ...state.city,
+    kitPurchases: {
+      ...state.city.kitPurchases,
+      [cmd.kitPurchaseId]: { id: cmd.kitPurchaseId, childId: cmd.childId, projectId: cmd.projectId, at },
+    },
+  }
+  if (opensNow) {
+    const nextId = cmd.projectId === 'road' ? NEXT_AFTER_ROAD : null
+    const projects = {
+      ...city.projects,
+      [cmd.projectId]: { ...project, kits, status: 'open' as const, openedAt: at },
+    }
+    if (nextId) {
+      projects[nextId] = { ...projects[nextId], status: 'building' }
+    }
+    city = { ...city, projects, currentProjectId: nextId, suggestedProjectId: null }
+  } else {
+    city = {
+      ...city,
+      projects: { ...city.projects, [cmd.projectId]: { ...project, kits } },
+    }
+  }
+
+  let next = withCity(withChild(state, cmd.childId, { ...child, coins: child.coins - KIT_PRICE }), city)
+  next = addLedger(next, {
+    id: `kit-${cmd.kitPurchaseId}`,
+    childId: cmd.childId,
+    coins: -KIT_PRICE,
+    stars: 0,
+    reason: 'kit',
+    refId: cmd.projectId,
+    at,
+  })
+  return { state: next, result: ok(next.city.kitPurchases[cmd.kitPurchaseId]) }
+}
+
+/** A child taps a locked plot to suggest the next building. */
+export function suggestProject(
+  state: GameState,
+  cmd: { childId: ChildId; projectId: ProjectId },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<GameState> {
+  void now
+  if (state.city.currentProjectId !== null) {
+    return { state, result: err('not-current-project', 'We are already building something.') }
+  }
+  const project = state.city.projects[cmd.projectId]
+  if (!project || !deps.getProject(cmd.projectId) || project.status !== 'locked') {
+    return { state, result: err('not-current-project', 'That plot cannot be suggested.') }
+  }
+  const next = withCity(state, { ...state.city, suggestedProjectId: cmd.projectId })
+  return { state: next, result: ok(next) }
+}
+
+/** Grown-up confirms the next building (after the current project opens). */
+export function chooseNextProject(
+  state: GameState,
+  cmd: { projectId: ProjectId },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<GameState> {
+  void now
+  if (state.city.currentProjectId !== null) {
+    return { state, result: err('not-current-project', 'A project is already in progress.') }
+  }
+  const project = state.city.projects[cmd.projectId]
+  if (!project || !deps.getProject(cmd.projectId) || project.status !== 'locked') {
+    return { state, result: err('not-current-project', 'That building cannot be started.') }
+  }
+  const next = withCity(state, {
+    ...state.city,
+    currentProjectId: cmd.projectId,
+    suggestedProjectId: null,
+    projects: { ...state.city.projects, [cmd.projectId]: { ...project, status: 'building' } },
+  })
+  return { state: next, result: ok(next) }
+}
+
+/** Command types that must run with grown-up authority (server enforces later). */
+export const GROWN_UP_COMMANDS: ReadonlySet<Command['type']> = new Set([
+  'approveClaim',
+  'rejectClaim',
+  'parentCompleteAndApprove',
+  'setParentPin',
+  'chooseNextProject',
+])
+
 export function setSound(
   state: GameState,
   cmd: { enabled: boolean },
@@ -485,5 +628,11 @@ export function applyCommand(
       return acknowledgePromotion(state, cmd, now, deps)
     case 'setSound':
       return setSound(state, cmd, now, deps)
+    case 'buyKit':
+      return buyKit(state, cmd, now, deps)
+    case 'suggestProject':
+      return suggestProject(state, cmd, now, deps)
+    case 'chooseNextProject':
+      return chooseNextProject(state, cmd, now, deps)
   }
 }

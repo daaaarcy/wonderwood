@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- box of building supplies -->
+  <rect x="6" y="26" width="52" height="32" rx="6" fill="#c98a5a"/>
+  <rect x="6" y="52" width="52" height="6" rx="3" fill="#a06a42"/>
+  <path d="M32 26 v32" stroke="#a06a42" stroke-width="4"/>
+  <path d="M6 26 q26 -18 52 0" fill="#e0a76f"/>
+  <!-- plank + tools poking out -->
+  <rect x="12" y="10" width="10" height="20" rx="3" fill="#96683f" transform="rotate(-14 17 22)"/>
+  <rect x="42" y="12" width="8" height="16" rx="3" fill="#777" transform="rotate(16 46 22)"/>
+  <circle cx="32" cy="12" r="6" fill="#ffc800"/>
+  <path d="M27 12 h10 M32 7 v10" stroke="#e5b400" stroke-width="3" stroke-linecap="round"/>
+</svg>

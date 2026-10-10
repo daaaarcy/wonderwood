@@ -35,7 +35,7 @@ export function PhaserGame({ scene, onSceneReady }: PhaserGameProps) {
 
   useEffect(() => {
     const handleReady = (sceneKey: string) => {
-      const expected = scene === 'island' ? 'IslandScene' : 'RoomScene'
+      const expected = scene === 'town' ? 'TownScene' : 'RoomScene'
       if (sceneKey === expected) {
         setReady(true)
         onSceneReady?.(true)

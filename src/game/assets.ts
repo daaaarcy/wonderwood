@@ -11,10 +11,15 @@ export const ASSET_FILES = {
   'explorer-leonard-cheer': 'assets/explorer-leonard-cheer.svg',
   'hat-leaf': 'assets/hat-leaf.svg',
   'toy-train': 'assets/toy-train.svg',
-  'island-bg': 'assets/island-bg.svg',
-  'treehouse-theodore': 'assets/treehouse-theodore.svg',
-  'treehouse-leonard': 'assets/treehouse-leonard.svg',
   'bridge-plank': 'assets/bridge-plank.svg',
+  'town-bg': 'assets/town-bg.svg',
+  'kit-box': 'assets/kit-box.svg',
+  truck: 'assets/truck.svg',
+  'icon-road': 'assets/icon-road.svg',
+  'icon-library': 'assets/icon-library.svg',
+  'icon-music': 'assets/icon-music.svg',
+  'icon-police': 'assets/icon-police.svg',
+  'icon-hospital': 'assets/icon-hospital.svg',
   'room-bg': 'assets/room-bg.svg',
   coin: 'assets/coin.svg',
   star: 'assets/star.svg',
@@ -29,6 +34,6 @@ export function assetUrl(key: AssetKey | string): string {
   return ASSET_FILES[key as AssetKey] ?? `assets/${key}.svg`
 }
 
-/** Design resolution for both scenes (matches island-bg / room-bg viewBox). */
+/** Design resolution for both scenes (matches town-bg / room-bg viewBox). */
 export const GAME_WIDTH = 1000
 export const GAME_HEIGHT = 700

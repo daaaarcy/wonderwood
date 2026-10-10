@@ -28,7 +28,7 @@ test('promotion overlay → Hooray → Wood badge persists; no overlay on reload
   // reload → no overlay again
   await page.reload()
   await page.getByRole('button', { name: 'Theodore' }).click()
-  await expect(page.locator('[data-scene="island"][data-scene-ready="true"]')).toBeAttached()
+  await expect(page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 

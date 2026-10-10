@@ -1,9 +1,9 @@
 import Phaser from 'phaser'
 import { GAME_HEIGHT, GAME_WIDTH } from './assets'
-import { IslandScene } from './scenes/IslandScene'
+import { TownScene } from './scenes/TownScene'
 import { RoomScene } from './scenes/RoomScene'
 
-export type WonderwoodScene = 'island' | 'room'
+export type WonderwoodScene = 'town' | 'room'
 
 export function startGame(parent: string, scene: WonderwoodScene): Phaser.Game {
   const config: Phaser.Types.Core.GameConfig = {
@@ -11,13 +11,13 @@ export function startGame(parent: string, scene: WonderwoodScene): Phaser.Game {
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
     parent,
-    backgroundColor: '#eafbff',
+    backgroundColor: '#bfe9f8',
     render: { antialias: true },
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    scene: scene === 'island' ? [IslandScene] : [RoomScene],
+    scene: scene === 'town' ? [TownScene] : [RoomScene],
   }
   return new Phaser.Game(config)
 }

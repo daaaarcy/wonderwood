@@ -8,8 +8,11 @@ import type { Command, GameState, Result } from '../domain/types'
 export interface GameRepository {
   /** Current in-memory state (always loaded eagerly). */
   load(): GameState
-  /** Apply a domain command; persists + notifies on success. */
-  dispatch(cmd: Command): Result<unknown>
+  /** Apply a domain command; persists + notifies on success. Async so a
+   *  server-backed repository can share the interface. */
+  dispatch(cmd: Command): Promise<Result<unknown>>
+  /** Connectivity/load hint for server-backed repositories. */
+  status?: 'loading' | 'ready' | 'offline'
   /** Called after every state change, including cross-tab updates. */
   subscribe(listener: () => void): () => void
 }

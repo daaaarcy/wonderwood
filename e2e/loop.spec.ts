@@ -7,7 +7,7 @@ async function switchExplorer(page: Page) {
 
 async function pickExplorer(page: Page, name: 'Theodore' | 'Leonard') {
   await page.getByRole('button', { name }).click()
-  await expect(page.locator('[data-scene="island"][data-scene-ready="true"]')).toBeAttached()
+  await expect(page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
 }
 
 async function enterGrownups(page: Page, pin = '1234') {
@@ -42,7 +42,7 @@ test('full loop: claim → approve → buy → room → persistence', async ({ p
   // --- pick Theodore, claim the language quest ---
   await pickExplorer(page, 'Theodore')
   await expect(page.getByTestId('coin-count')).toHaveText('20')
-  await expect(page.getByTestId('bridge-status')).toHaveText('Bridge: 0 of 12 planks')
+  await expect(page.getByTestId('project-road')).toHaveText('Road: 0 of 2 kits')
 
   const langCard = page.locator('.quest-card', { hasText: 'Do your Duolingo lesson' })
   await langCard.getByRole('button', { name: 'I did it!' }).click()
@@ -61,7 +61,7 @@ test('full loop: claim → approve → buy → room → persistence', async ({ p
   await pickExplorer(page, 'Theodore')
   await dismissCelebration(page)
   await expect(page.getByTestId('coin-count')).toHaveText('30')
-  await expect(page.getByTestId('bridge-status')).toHaveText('Bridge: 1 of 12 planks')
+  await expect(page.getByTestId('project-road')).toHaveText('Road: 0 of 2 kits')
   await expect(
     page.locator('.quest-card', { hasText: 'Do your Duolingo lesson' }).getByText('Done!'),
   ).toBeVisible()
@@ -87,7 +87,7 @@ test('full loop: claim → approve → buy → room → persistence', async ({ p
   await page.reload()
   await pickExplorer(page, 'Theodore')
   await expect(page.getByTestId('coin-count')).toHaveText('10')
-  await expect(page.getByTestId('bridge-status')).toHaveText('Bridge: 1 of 12 planks')
+  await expect(page.getByTestId('project-road')).toHaveText('Road: 0 of 2 kits')
   await page.getByRole('button', { name: 'My room' }).click()
   await expect(page.locator('[data-scene="room"][data-scene-ready="true"]')).toBeAttached()
   await expect(page.getByTestId('equipped-hat')).toHaveText('hat-leaf')
@@ -107,7 +107,7 @@ test('double-clicking Approve awards the quest only once', async ({ page }) => {
   await pickExplorer(page, 'Theodore')
   await dismissCelebration(page)
   await expect(page.getByTestId('coin-count')).toHaveText('30')
-  await expect(page.getByTestId('bridge-status')).toHaveText('Bridge: 1 of 12 planks')
+  await expect(page.getByTestId('project-road')).toHaveText('Road: 0 of 2 kits')
 })
 
 test('claim → reject → re-claim → approve awards +10 once', async ({ page }) => {
@@ -144,7 +144,7 @@ test('claim → reject → re-claim → approve awards +10 once', async ({ page 
   await pickExplorer(page, 'Theodore')
   await dismissCelebration(page)
   await expect(page.getByTestId('coin-count')).toHaveText('30')
-  await expect(page.getByTestId('bridge-status')).toHaveText('Bridge: 1 of 12 planks')
+  await expect(page.getByTestId('project-road')).toHaveText('Road: 0 of 2 kits')
 })
 
 test("Leonard's quests differ from Theodore's", async ({ page }) => {

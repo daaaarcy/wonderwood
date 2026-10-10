@@ -1,5 +1,21 @@
-import type { ChildState, GameState, LeagueState } from './types'
+import type { ChildState, CityState, GameState, LeagueState } from './types'
 import { WELCOME_COINS } from './types'
+
+function initialCity(): CityState {
+  return {
+    currentProjectId: 'road',
+    suggestedProjectId: null,
+    projects: {
+      road: { kits: 0, status: 'building' },
+      library: { kits: 0, status: 'locked' },
+      'music-school': { kits: 0, status: 'locked' },
+      'police-station': { kits: 0, status: 'locked' },
+      hospital: { kits: 0, status: 'locked' },
+    },
+    kitPurchases: {},
+    foundersBridgePlanks: 0,
+  }
+}
 
 /** Local YYYY-MM-DD for a Date — the "activity day" a claim belongs to. */
 export function localDateKey(d: Date): string {
@@ -27,7 +43,7 @@ function initialChild(): ChildState {
 export function initialState(now: Date = new Date()): GameState {
   const at = now.toISOString()
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     createdAt: at,
     children: {
       theodore: initialChild(),
@@ -41,5 +57,6 @@ export function initialState(now: Date = new Date()): GameState {
     ],
     parentPinHash: null,
     settings: { sound: true },
+    city: initialCity(),
   }
 }

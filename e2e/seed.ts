@@ -1,7 +1,7 @@
 import { applyCommand } from '../src/domain/commands'
 import { initialState } from '../src/domain/state'
 import { addDays, mondayKey, parseDateKey } from '../src/domain/week'
-import type { GameState } from '../src/domain/types'
+import type { GameState, ProjectId } from '../src/domain/types'
 import { commandDeps } from '../src/data/registry'
 import { questsFor } from '../src/data/quests'
 
@@ -40,21 +40,57 @@ export function promotionSeed(): GameState {
   return s
 }
 
-/** State with a given bridge-plank count (stars split across both children). */
-export function bridgeSeed(planks: number): GameState {
-  return freshState((s) => {
-    const t = Math.ceil(planks / 2)
-    s.children.theodore.stars = t
-    s.children.leonard.stars = planks - t
-  })
-}
-
-/** State with Theodore at a given league rank; createdAt last week so the
- *  in-progress week is fully eligible (progress UI, not a rest week). */
+/** State with a given league rank; createdAt last week so the in-progress
+ *  week is fully eligible (progress UI, not a rest week). */
 export function leagueSeed(rank: number): GameState {
   return freshState((s) => {
     s.children.theodore.league.rank = rank
     const lastMonday = addDays(parseDateKey(mondayKey(new Date())), -7)
     s.createdAt = lastMonday.toISOString()
+  })
+}
+
+/** State with a project at a given kit count (status derived). */
+export function citySeed(
+  kits: Partial<Record<ProjectId, number>>,
+  opts: { current?: ProjectId | null; suggested?: ProjectId | null } = {},
+): GameState {
+  return freshState((s) => {
+    for (const [id, k] of Object.entries(kits) as [ProjectId, number][]) {
+      const required = { road: 2, library: 6, 'music-school': 8, 'police-station': 10, hospital: 12 }[id]
+      const open = k >= required
+      s.city.projects[id] = {
+        kits: k,
+        status: open ? 'open' : 'building',
+        openedAt: open ? new Date().toISOString() : undefined,
+      }
+    }
+    s.city.currentProjectId = opts.current !== undefined ? opts.current : 'road'
+    s.city.suggestedProjectId = opts.suggested ?? null
+  })
+}
+
+/** A raw v2 save JSON (pre-city schema) to exercise the migration path. */
+export function v2SeedJson(stars: { theodore: number; leonard: number }): string {
+  const child = (coins: number, stars: number) => ({
+    coins,
+    stars,
+    inventory: ['toy-train'],
+    equipped: { hat: null, toy: 'toy-train' },
+    wishItem: null,
+    league: { rank: 1, evaluatedWeeks: {}, unseenPromotion: null },
+  })
+  return JSON.stringify({
+    schemaVersion: 2,
+    createdAt: new Date(Date.now() - 14 * 86400_000).toISOString(),
+    children: {
+      theodore: child(40, stars.theodore),
+      leonard: child(30, stars.leonard),
+    },
+    claims: {},
+    purchases: {},
+    ledger: [],
+    parentPinHash: null,
+    settings: { sound: true },
   })
 }

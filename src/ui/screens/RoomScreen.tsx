@@ -53,7 +53,7 @@ export function RoomScreen({ childId }: { childId: ChildId }) {
           <button
             className="btn btn-big"
             onClick={() =>
-              repo.dispatch({ type: 'equip', childId, slot: 'hat', itemId: hatOn ? null : 'hat-leaf' })
+              void repo.dispatch({ type: 'equip', childId, slot: 'hat', itemId: hatOn ? null : 'hat-leaf' })
             }
           >
             {hatOn ? 'Take off hat' : 'Wear hat'}

@@ -1334,3 +1334,138 @@ button {
     outline: 4px solid var(--green);
   }
 }
+
+/* ---------- town / project card / sheets ---------- */
+
+.project-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.project-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.project-head h3 {
+  margin: 0;
+}
+.project-node {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18);
+}
+.project-name {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+.kit-pips {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.kit-pip {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  opacity: 0.25;
+  filter: grayscale(1);
+}
+.kit-pip.filled {
+  opacity: 1;
+  filter: none;
+}
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(60, 60, 60, 0.35);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 65;
+  padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
+}
+.sheet {
+  background: var(--white);
+  border: 2px solid var(--border);
+  border-bottom-width: 5px;
+  border-radius: 20px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(92vw, 400px);
+  text-align: center;
+  animation: sheet-up 0.25s ease-out both;
+}
+@keyframes sheet-up {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.sheet-icon {
+  width: 64px;
+  height: 64px;
+}
+.sheet-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+.sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.sheet .btn {
+  width: 100%;
+}
+.opening-explorers {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+  height: 96px;
+  margin-top: -60px;
+}
+.opening-explorers .celebration-cheer {
+  position: static;
+  transform: none;
+  width: 88px;
+}
+.opening-explorers .cheer-right {
+  animation-delay: 0.15s;
+}
+
+/* quest button shouldn't overflow the narrow right column */
+@media (min-width: 900px) {
+  .home-side .quest-card .btn-big {
+    padding: 8px 14px;
+    font-size: 0.92rem;
+    min-height: 52px;
+  }
+  .quest-label {
+    min-width: 0;
+  }
+}
+
+.tag-suggested {
+  margin-left: 8px;
+  background: #ddf4fe;
+  border-color: var(--blue-lip);
+  color: var(--blue-lip);
+  padding: 2px 8px;
+  font-size: 0.75rem;
+}
+.row-suggested {
+  border-color: var(--blue);
+  background: #ddf4fe;
+}

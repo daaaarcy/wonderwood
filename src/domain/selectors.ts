@@ -1,6 +1,7 @@
 import { localDateKey } from './state'
 import { addDays, eligibleDays, mondayKey, parseDateKey } from './week'
-import type { ChildId, GameState } from './types'
+import { projectById } from '../data/city'
+import type { ChildId, GameState, ProjectId } from './types'
 
 export type QuestStatus = 'available' | 'pending' | 'done'
 
@@ -38,24 +39,36 @@ export function todayQuestsFor(
   })
 }
 
-export interface IslandProgress {
-  placed: number
-  total: number
-  complete: boolean
+/* ---------------- Town projects ---------------- */
+
+export type ProjectStage = 'site' | 'foundations' | 'walls' | 'roof' | 'open'
+
+export interface ProjectView {
+  kits: number
+  required: number
+  stage: ProjectStage
+  percent: number
+  status: 'locked' | 'building' | 'open'
 }
 
 /**
- * Stars earned by BOTH children become planks on the shared bridge —
- * never framed as one child vs the other.
+ * Visual stage of a building project.
+ * 0 → site, <40% → foundations, <75% → walls, <100% → roof, 100% → open.
  */
-export function islandProgress(state: GameState, totalPlanks: number): IslandProgress {
-  const stars = state.children.theodore.stars + state.children.leonard.stars
-  const placed = Math.min(stars, totalPlanks)
-  return { placed, total: totalPlanks, complete: placed >= totalPlanks }
-}
-
-export function bridgeComplete(state: GameState, totalPlanks: number): boolean {
-  return islandProgress(state, totalPlanks).complete
+export function projectView(state: GameState, projectId: ProjectId): ProjectView {
+  const def = projectById(projectId)
+  const proj = state.city.projects[projectId]
+  const kits = proj?.kits ?? 0
+  const required = def?.kits ?? 1
+  const percent = Math.min(1, kits / required)
+  const status = proj?.status ?? 'locked'
+  let stage: ProjectStage
+  if (status === 'open') stage = 'open'
+  else if (percent <= 0) stage = 'site'
+  else if (percent < 0.4) stage = 'foundations'
+  else if (percent < 0.75) stage = 'walls'
+  else stage = 'roof'
+  return { kits, required, stage, percent, status }
 }
 
 /** Claims awaiting a grown-up decision, oldest first. */

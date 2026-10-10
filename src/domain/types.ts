@@ -4,7 +4,7 @@ export const CHILD_IDS: ChildId[] = ['theodore', 'leonard']
 
 export type EquipSlot = 'hat' | 'toy'
 export type ClaimStatus = 'pending' | 'approved' | 'rejected'
-export type LedgerReason = 'welcome' | 'quest' | 'purchase'
+export type LedgerReason = 'welcome' | 'quest' | 'purchase' | 'kit'
 
 export interface LedgerEntry {
   id: string
@@ -53,8 +53,34 @@ export interface ChildState {
   league: LeagueState
 }
 
+/* ---------------- Town / city ---------------- */
+
+/** Town projects (defs in src/data/city.ts). */
+export type ProjectId = 'road' | 'library' | 'music-school' | 'police-station' | 'hospital'
+
+export type ProjectStatus = 'locked' | 'building' | 'open'
+
+export interface CityProjectState {
+  kits: number
+  status: ProjectStatus
+  openedAt?: string
+}
+
+export interface CityState {
+  currentProjectId: ProjectId | null
+  suggestedProjectId: ProjectId | null
+  projects: Record<ProjectId, CityProjectState>
+  /** Kit purchase log, keyed by kitPurchaseId for idempotency. */
+  kitPurchases: Record<
+    string,
+    { id: string; childId: ChildId; projectId: ProjectId; at: string }
+  >
+  /** Keepsake from the island era — frozen at migration, never spent. */
+  foundersBridgePlanks: number
+}
+
 export interface GameState {
-  schemaVersion: 2
+  schemaVersion: 3
   /** ISO timestamp of when this save was first created. */
   createdAt: string
   children: Record<ChildId, ChildState>
@@ -64,6 +90,7 @@ export interface GameState {
   parentPinHash: string | null
   /** Per-device settings. */
   settings: { sound: boolean }
+  city: CityState
 }
 
 export interface CatalogItem {
@@ -86,6 +113,9 @@ export type Command =
   | { type: 'evaluateLeagues' }
   | { type: 'acknowledgePromotion'; childId: ChildId }
   | { type: 'setSound'; enabled: boolean }
+  | { type: 'buyKit'; childId: ChildId; projectId: ProjectId; kitPurchaseId: string }
+  | { type: 'suggestProject'; childId: ChildId; projectId: ProjectId }
+  | { type: 'chooseNextProject'; projectId: ProjectId }
 
 export type DomainErrorCode =
   | 'already-claimed-today'
@@ -98,6 +128,8 @@ export type DomainErrorCode =
   | 'item-not-owned'
   | 'wrong-slot'
   | 'invalid-pin'
+  | 'not-current-project'
+  | 'project-complete'
 
 export interface DomainError {
   code: DomainErrorCode
@@ -115,6 +147,8 @@ export interface CommandOutcome<T> {
 export interface CommandDeps {
   questExists: (questId: string) => boolean
   getItem: (itemId: string) => CatalogItem | undefined
+  /** Town project def (kits required); undefined for unknown ids. */
+  getProject: (projectId: string) => { id: ProjectId; kits: number } | undefined
   /** Sync hasher for PINs. The UI passes a pre-computed crypto.subtle SHA-256 in cmd.pinHash. */
   hashPin: (pin: string) => string
 }

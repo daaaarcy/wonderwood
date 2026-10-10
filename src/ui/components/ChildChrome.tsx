@@ -35,7 +35,10 @@ function TabIcon({ tab }: { tab: ChildTab }) {
     case 'room':
       return (
         <svg {...p}>
-          <path d="M4 21 V11 l8 -7 8 7 v10 h-6 v-6 h-4 v6 z" fill="currentColor" />
+          <path d="M4 6.5 V20" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+          <path d="M20 16.5 V20" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+          <rect x="4" y="14" width="17" height="5" rx="2.5" fill="currentColor" />
+          <rect x="5.4" y="10.4" width="5.4" height="3.8" rx="1.8" fill="currentColor" />
         </svg>
       )
     case 'league':

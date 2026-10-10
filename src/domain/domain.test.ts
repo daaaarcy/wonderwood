@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { applyCommand, claimQuest } from './commands'
 import { initialState, localDateKey } from './state'
-import { islandProgress, pendingClaims, todayQuestsFor } from './selectors'
+import { pendingClaims, todayQuestsFor } from './selectors'
 import type { CommandDeps, GameState } from './types'
 import { commandDeps } from '../data/registry'
-import { CHAPTER_ONE } from '../data/island'
 import { questsFor } from '../data/quests'
 
 const deps: CommandDeps = commandDeps
@@ -180,27 +179,6 @@ describe('equip', () => {
   })
 })
 
-describe('islandProgress', () => {
-  it('sums approved stars of BOTH children and caps at chapter size', () => {
-    let s = initialState(NOW)
-    s = run(s, { type: 'parentCompleteAndApprove', childId: 'theodore', questId: 'theodore-language', claimId: 'a1' }).state
-    s = run(s, { type: 'parentCompleteAndApprove', childId: 'leonard', questId: 'leonard-kindness', claimId: 'a2' }).state
-    let p = islandProgress(s, CHAPTER_ONE.planks)
-    expect(p.placed).toBe(2)
-    expect(p.complete).toBe(false)
-    // Force stars above cap:
-    s = {
-      ...s,
-      children: {
-        theodore: { ...s.children.theodore, stars: 10 },
-        leonard: { ...s.children.leonard, stars: 5 },
-      },
-    }
-    p = islandProgress(s, CHAPTER_ONE.planks)
-    expect(p.placed).toBe(12)
-    expect(p.complete).toBe(true)
-  })
-})
 
 describe('selectors', () => {
   it('todayQuestsFor reports available → pending → done', () => {

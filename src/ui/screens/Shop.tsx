@@ -45,7 +45,7 @@ export function Shop({ childId }: { childId: ChildId }) {
                   className="btn btn-big btn-yes"
                   disabled={needed > 0}
                   onClick={() =>
-                    repo.dispatch({
+                    void repo.dispatch({
                       type: 'purchase',
                       childId,
                       itemId: selected.id,
@@ -57,7 +57,7 @@ export function Shop({ childId }: { childId: ChildId }) {
                 </button>
                 <button
                   className="btn btn-ghost"
-                  onClick={() => repo.dispatch({ type: 'setWish', childId, itemId: selected.id })}
+                  onClick={() => void repo.dispatch({ type: 'setWish', childId, itemId: selected.id })}
                 >
                   {child.wishItem === selected.id ? 'Saving for this!' : 'Save for this'}
                 </button>
@@ -67,7 +67,7 @@ export function Shop({ childId }: { childId: ChildId }) {
               <button
                 className="btn btn-big"
                 onClick={() =>
-                  repo.dispatch({
+                  void repo.dispatch({
                     type: 'equip',
                     childId,
                     slot: 'hat',

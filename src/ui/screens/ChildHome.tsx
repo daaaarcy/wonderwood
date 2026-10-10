@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { islandProgress, todayQuestsFor } from '../../domain/selectors'
-import type { ChildId } from '../../domain/types'
+import { projectView, todayQuestsFor } from '../../domain/selectors'
+import type { ChildId, ProjectId } from '../../domain/types'
 import { CHILDREN } from '../../data/children'
 import { itemById } from '../../data/catalogue'
-import { CHAPTER_ONE } from '../../data/island'
+import { KIT_PRICE, PROJECTS, projectById } from '../../data/city'
 import { questsFor } from '../../data/quests'
 import { assetUrl } from '../../game/assets'
 import { EventBus } from '../../game/EventBus'
@@ -19,6 +19,33 @@ function speak(text: string) {
   }
 }
 
+/** Per-device record of building openings already celebrated. */
+const OPENINGS_KEY = 'wonderwood:seen-openings'
+
+function seenOpenings(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(OPENINGS_KEY) ?? '[]') as string[]
+  } catch {
+    return []
+  }
+}
+
+function markOpeningSeen(key: string) {
+  try {
+    const seen = seenOpenings()
+    if (!seen.includes(key)) {
+      localStorage.setItem(OPENINGS_KEY, JSON.stringify([...seen, key]))
+    }
+  } catch {
+    // private mode etc — harmless
+  }
+}
+
+type Sheet =
+  | { kind: 'plot'; projectId: ProjectId }
+  | { kind: 'bridge'; planks: number }
+  | { kind: 'buy-kit' }
+
 export function ChildHome({ childId }: { childId: ChildId }) {
   const state = useGameState()
   const repo = useRepository()
@@ -26,8 +53,13 @@ export function ChildHome({ childId }: { childId: ChildId }) {
   const def = CHILDREN[childId]
   const [sceneReady, setSceneReady] = useState(false)
   const [celebration, setCelebration] = useState<CelebrationData | null>(null)
+  const [opening, setOpening] = useState<ProjectId | null>(null)
+  const [sheet, setSheet] = useState<Sheet | null>(null)
+  const [busy, setBusy] = useState(false)
   const prev = useRef<{ childId: ChildId; coins: number; stars: number } | null>(null)
+  const prevOpenings = useRef<Set<string> | null>(null)
 
+  const city = state.city
   const quests = questsFor(childId)
   const today = todayQuestsFor(
     state,
@@ -35,11 +67,10 @@ export function ChildHome({ childId }: { childId: ChildId }) {
     quests.map((q) => q.id),
     new Date(),
   )
-  const progress = islandProgress(state, CHAPTER_ONE.planks)
 
   // League weeks end Sunday night — evaluate any that closed since last visit.
   useEffect(() => {
-    repo.dispatch({ type: 'evaluateLeagues' })
+    void repo.dispatch({ type: 'evaluateLeagues' })
   }, [repo])
 
   // Celebrate when this child's coins/stars grow while the home screen is open.
@@ -57,34 +88,151 @@ export function ChildHome({ childId }: { childId: ChildId }) {
     }
   }, [state, childId])
 
-  // Push world state into the island scene once it is listening.
+  // A building that just opened (and hasn't been celebrated on this device)
+  // gets the big opening-day moment.
+  useEffect(() => {
+    if (prevOpenings.current === null) {
+      // first paint: only celebrate transitions from now on
+      prevOpenings.current = new Set(
+        PROJECTS.map((p) => {
+          const o = city.projects[p.id].openedAt
+          return o ? `${p.id}:${o}` : ''
+        }).filter(Boolean),
+      )
+      return
+    }
+    for (const p of PROJECTS) {
+      const o = city.projects[p.id].openedAt
+      if (!o) continue
+      const key = `${p.id}:${o}`
+      if (!prevOpenings.current.has(key) && !seenOpenings().includes(key)) {
+        prevOpenings.current.add(key)
+        setOpening(p.id)
+      } else {
+        prevOpenings.current.add(key)
+      }
+    }
+  }, [city])
+
+  // Push world state into the town scene once it is listening.
   useEffect(() => {
     if (!sceneReady) return
-    EventBus.emit('island-state', {
-      planks: progress.placed,
-      total: progress.total,
-      complete: progress.complete,
+    EventBus.emit('town-state', {
+      projects: Object.fromEntries(
+        PROJECTS.map((p) => [p.id, { kits: city.projects[p.id].kits, status: city.projects[p.id].status }]),
+      ),
+      currentProjectId: city.currentProjectId,
+      suggestedProjectId: city.suggestedProjectId,
       hats: {
         theodore: state.children.theodore.equipped.hat,
         leonard: state.children.leonard.equipped.hat,
       },
+      foundersPlanks: city.foundersBridgePlanks,
     })
-  }, [state, sceneReady, progress.placed, progress.total, progress.complete])
+  }, [state, sceneReady, city])
+
+  // Taps inside the scene bubble up as info sheets.
+  useEffect(() => {
+    const onTap = (e: { kind: string; projectId?: ProjectId; planks?: number }) => {
+      if (e.kind === 'plot' && e.projectId) setSheet({ kind: 'plot', projectId: e.projectId })
+      if (e.kind === 'bridge' && e.planks) setSheet({ kind: 'bridge', planks: e.planks })
+    }
+    EventBus.on('town-tap', onTap)
+    return () => {
+      EventBus.off('town-tap', onTap)
+    }
+  }, [])
 
   const wish = child.wishItem ? itemById(child.wishItem) : undefined
   const promotion = child.league.unseenPromotion
+  const current = city.currentProjectId ? projectById(city.currentProjectId) : undefined
+  const currentView = city.currentProjectId ? projectView(state, city.currentProjectId) : undefined
+  const suggested = city.suggestedProjectId ? projectById(city.suggestedProjectId) : undefined
+  const canAffordKit = child.coins >= KIT_PRICE
+
+  const buyKit = async () => {
+    if (!city.currentProjectId || busy) return
+    setBusy(true)
+    try {
+      await repo.dispatch({
+        type: 'buyKit',
+        childId,
+        projectId: city.currentProjectId,
+        kitPurchaseId: crypto.randomUUID(),
+      })
+      setSheet(null)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const sheetProject = sheet?.kind === 'plot' ? projectById(sheet.projectId) : undefined
+  const sheetView = sheet?.kind === 'plot' ? projectView(state, sheet.projectId) : undefined
 
   return (
     <div className="screen home-screen" style={{ ['--accent' as string]: def.color }}>
       <div className="home-main">
         <div className="island-wrap">
-          <PhaserGame scene="island" onSceneReady={setSceneReady} />
+          <PhaserGame scene="town" onSceneReady={setSceneReady} />
         </div>
 
         <div className="home-side">
-          <p className="sr-only" data-testid="bridge-status">
-            Bridge: {progress.placed} of {progress.total} planks
+          {/* hidden status for tests */}
+          {PROJECTS.map((p) => (
+            <p key={p.id} className="sr-only" data-testid={`project-${p.id}`}>
+              {p.label}: {city.projects[p.id].status === 'open' ? 'open' : `${city.projects[p.id].kits} of ${p.kits} kits`}
+            </p>
+          ))}
+          <p className="sr-only" data-testid="founders-bridge">
+            {city.foundersBridgePlanks > 0
+              ? `Founders' Bridge: ${city.foundersBridgePlanks} planks`
+              : 'no founders bridge'}
           </p>
+
+          {/* project card */}
+          {current && currentView ? (
+            <section className="panel project-card" aria-label="Current building project">
+              <div className="project-head">
+                <span className="project-node" style={{ background: current.color }}>
+                  <img src={assetUrl(current.iconKey)} alt="" className="quest-icon" />
+                </span>
+                <div>
+                  <h3 className="project-name">Our {current.label}</h3>
+                  <p className="muted">
+                    Building supplies: {currentView.kits} of {currentView.required} kits
+                  </p>
+                </div>
+              </div>
+              <div className="kit-pips" aria-hidden="true">
+                {Array.from({ length: currentView.required }, (_, i) => (
+                  <img
+                    key={i}
+                    src={assetUrl('kit-box')}
+                    alt=""
+                    className={i < currentView.kits ? 'kit-pip filled' : 'kit-pip'}
+                  />
+                ))}
+              </div>
+              <button
+                className="btn btn-big btn-yes"
+                disabled={!canAffordKit || busy}
+                onClick={() => setSheet({ kind: 'buy-kit' })}
+              >
+                {canAffordKit
+                  ? `Buy & add one kit — ${KIT_PRICE} coins`
+                  : `Need ${KIT_PRICE - child.coins} more coin${KIT_PRICE - child.coins === 1 ? '' : 's'}`}
+              </button>
+            </section>
+          ) : (
+            <section className="panel project-card" aria-label="Next building project">
+              <h3 className="project-name">Pick the next building with a grown-up</h3>
+              <p className="muted">
+                {suggested
+                  ? `${CHILDREN[childId].name} suggested the ${suggested.label} — a grown-up can say yes.`
+                  : 'Tap a ? plot in town to suggest one!'}
+              </p>
+            </section>
+          )}
 
           {wish && (
             <div className="wish-bar">
@@ -137,7 +285,7 @@ export function ChildHome({ childId }: { childId: ChildId }) {
                       onClick={() =>
                         // Fresh id per tap; double-tap safety lives in the domain's
                         // one-active-claim-per-quest-per-day rule.
-                        repo.dispatch({
+                        void repo.dispatch({
                           type: 'claimQuest',
                           childId,
                           questId: quest.id,
@@ -163,13 +311,121 @@ export function ChildHome({ childId }: { childId: ChildId }) {
         </div>
       </div>
 
+      {/* bottom sheets */}
+      {sheet?.kind === 'buy-kit' && current && (
+        <div className="sheet-backdrop" onClick={() => setSheet(null)}>
+          <div className="sheet" role="dialog" aria-label="Buy a building kit" onClick={(e) => e.stopPropagation()}>
+            <img src={assetUrl('kit-box')} alt="" className="sheet-icon" />
+            <p className="sheet-title">Add one kit to the {current.label} for {KIT_PRICE} coins?</p>
+            <div className="sheet-actions">
+              <button className="btn btn-yes" onClick={() => void buyKit()} disabled={busy}>
+                {busy ? 'Adding…' : 'Yes, add it!'}
+              </button>
+              <button className="btn btn-neutral" onClick={() => setSheet(null)}>
+                Not now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {sheet?.kind === 'plot' && sheetProject && sheetView && (
+        <div className="sheet-backdrop" onClick={() => setSheet(null)}>
+          <div
+            className="sheet"
+            role="dialog"
+            aria-label={sheetProject.name}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="project-node" style={{ background: sheetProject.color }}>
+              <img src={assetUrl(sheetProject.iconKey)} alt="" className="quest-icon" />
+            </span>
+            <p className="sheet-title">{sheetProject.name}</p>
+            <p className="muted">
+              {sheetView.status === 'open'
+                ? 'It\u2019s open — hooray!'
+                : sheetView.status === 'building'
+                  ? `${sheetView.kits} of ${sheetView.required} kits so far`
+                  : `Needs ${sheetView.required} kits to build`}
+            </p>
+            {sheetView.status === 'locked' && city.currentProjectId === null && (
+              <button
+                className="btn"
+                onClick={() => {
+                  void repo.dispatch({ type: 'suggestProject', childId, projectId: sheetProject.id })
+                  setSheet(null)
+                }}
+              >
+                Suggest this
+              </button>
+            )}
+            <button className="btn btn-neutral" onClick={() => setSheet(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sheet?.kind === 'bridge' && (
+        <div className="sheet-backdrop" onClick={() => setSheet(null)}>
+          <div className="sheet" role="dialog" aria-label="Founders' Bridge" onClick={(e) => e.stopPropagation()}>
+            <p className="sheet-title">Founders&rsquo; Bridge</p>
+            <p className="muted">
+              {sheet.planks} planks laid by Theodore &amp; Leonard on the old island.
+            </p>
+            <button className="btn btn-neutral" onClick={() => setSheet(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* opening-day celebration */}
+      {opening && (
+        <div className="celebration" role="dialog" aria-label="A building opened!">
+          <div className="confetti" aria-hidden="true">
+            {Array.from({ length: 26 }, (_, i) => (
+              <i
+                key={i}
+                style={{
+                  left: `${(i * 37) % 100}%`,
+                  width: 12,
+                  height: 12 + (i % 3) * 4,
+                  background: ['#58cc02', '#1cb0f6', '#ffc800', '#ff9600', '#ce82ff'][i % 5],
+                  animationDelay: `${(i % 8) * 0.14}s`,
+                  ['--drift' as string]: `${(i % 5 - 2) * 40}px`,
+                }}
+              />
+            ))}
+          </div>
+          <div className="celebration-card">
+            <div className="opening-explorers">
+              <img className="celebration-cheer" src={assetUrl('explorer-theodore-cheer')} alt="" />
+              <img className="celebration-cheer cheer-right" src={assetUrl('explorer-leonard-cheer')} alt="" />
+            </div>
+            <p className="celebration-text">The {projectById(opening)?.label} is open!</p>
+            <p className="celebration-sub">The whole town says thank you!</p>
+            <button
+              className="btn btn-big btn-yes"
+              onClick={() => {
+                const o = city.projects[opening].openedAt
+                if (o) markOpeningSeen(`${opening}:${o}`)
+                setOpening(null)
+              }}
+            >
+              Hooray!
+            </button>
+          </div>
+        </div>
+      )}
+
       {promotion && (
         <PromotionOverlay
           childId={childId}
           from={promotion.from}
           to={promotion.to}
           soundOn={state.settings.sound}
-          onDone={() => repo.dispatch({ type: 'acknowledgePromotion', childId })}
+          onDone={() => void repo.dispatch({ type: 'acknowledgePromotion', childId })}
         />
       )}
 

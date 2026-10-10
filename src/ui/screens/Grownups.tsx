@@ -8,6 +8,7 @@ import { useGameState, useRepository } from '../../storage/hooks'
 import { sha256Hex } from '../../storage/pin'
 import { LeagueBadge } from '../components/LeagueBadge'
 import { leagueTitle } from '../../data/leagues'
+import { PROJECTS, projectById } from '../../data/city'
 
 type PinStage = 'set' | 'confirm' | 'enter'
 
@@ -49,7 +50,7 @@ export function Grownups({ onExit }: { onExit: () => void }) {
         return
       }
       const pinHash = await sha256Hex(pin)
-      repo.dispatch({ type: 'setParentPin', pin, pinHash })
+      void repo.dispatch({ type: 'setParentPin', pin, pinHash })
       setUnlocked(true)
       return
     }
@@ -134,13 +135,13 @@ export function Grownups({ onExit }: { onExit: () => void }) {
                 <div className="claim-actions">
                   <button
                     className="btn btn-yes"
-                    onClick={() => repo.dispatch({ type: 'approveClaim', claimId: claim.id })}
+                    onClick={() => void repo.dispatch({ type: 'approveClaim', claimId: claim.id })}
                   >
                     Approve
                   </button>
                   <button
                     className="btn btn-ghost"
-                    onClick={() => repo.dispatch({ type: 'rejectClaim', claimId: claim.id })}
+                    onClick={() => void repo.dispatch({ type: 'rejectClaim', claimId: claim.id })}
                   >
                     Not yet
                   </button>
@@ -151,6 +152,46 @@ export function Grownups({ onExit }: { onExit: () => void }) {
         </ul>
       </section>
 
+      {state.city.currentProjectId === null && (
+        <section className="panel next-building" aria-label="Choose the next building">
+          <h3>Next building</h3>
+          {state.city.suggestedProjectId && (
+            <p className="muted">
+              The explorers suggested the{' '}
+              <strong>{projectById(state.city.suggestedProjectId)?.label}</strong>.
+            </p>
+          )}
+          <ul className="claim-list">
+            {PROJECTS.filter((p) => state.city.projects[p.id].status === 'locked').map((p) => (
+              <li
+                key={p.id}
+                className={`claim-row ${state.city.suggestedProjectId === p.id ? 'row-suggested' : ''}`}
+              >
+                <div className="claim-info">
+                  <span className="quest-icon-small" style={{ background: p.color }}>
+                    <img src={assetUrl(p.iconKey)} alt="" />
+                  </span>
+                  <span>
+                    {p.name} <span className="muted">· {p.kits} kits</span>
+                    {state.city.suggestedProjectId === p.id && (
+                      <span className="tag tag-suggested">Suggested</span>
+                    )}
+                  </span>
+                </div>
+                <div className="claim-actions">
+                  <button
+                    className="btn btn-yes"
+                    onClick={() => void repo.dispatch({ type: 'chooseNextProject', projectId: p.id })}
+                  >
+                    Build this next
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="panel settings-panel">
         <h3>Settings</h3>
         <label className="sound-toggle">
@@ -159,7 +200,7 @@ export function Grownups({ onExit }: { onExit: () => void }) {
             className={`btn btn-small ${state.settings.sound ? 'btn-yes' : 'btn-ghost'}`}
             role="switch"
             aria-checked={state.settings.sound}
-            onClick={() => repo.dispatch({ type: 'setSound', enabled: !state.settings.sound })}
+            onClick={() => void repo.dispatch({ type: 'setSound', enabled: !state.settings.sound })}
           >
             {state.settings.sound ? 'On' : 'Off'}
           </button>
@@ -196,7 +237,7 @@ export function Grownups({ onExit }: { onExit: () => void }) {
                         <button
                           className="btn btn-yes"
                           onClick={() =>
-                            repo.dispatch({
+                            void repo.dispatch({
                               type: 'parentCompleteAndApprove',
                               childId: child.id,
                               questId: quest.id,

@@ -32,17 +32,22 @@ describe('LocalStorageRepository', () => {
     const storage = new FakeStorage()
     const repo = new LocalStorageRepository(storage, commandDeps)
     const s = repo.load()
-    expect(s.schemaVersion).toBe(2)
+    expect(s.schemaVersion).toBe(3)
     expect(s.children.theodore.coins).toBe(20)
+    expect(s.city.currentProjectId).toBe('road')
+    expect(s.city.projects.road.status).toBe('building')
+    expect(s.city.projects.library.status).toBe('locked')
+    expect(s.city.foundersBridgePlanks).toBe(0)
     expect(storage.getItem(STORAGE_KEY)).toBe(JSON.stringify(s))
   })
 
-  it('round-trips: load after save gives equal state', () => {
+  it('round-trips: load after save gives equal state', async () => {
     const storage = new FakeStorage()
     const repo1 = new LocalStorageRepository(storage, commandDeps)
-    repo1.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'c1' })
-    repo1.dispatch({ type: 'approveClaim', claimId: 'c1' })
-    repo1.dispatch({ type: 'purchase', childId: 'theodore', itemId: 'hat-leaf', purchaseId: 'p1' })
+    await repo1.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'c1' })
+    await repo1.dispatch({ type: 'approveClaim', claimId: 'c1' })
+    await repo1.dispatch({ type: 'purchase', childId: 'theodore', itemId: 'hat-leaf', purchaseId: 'p1' })
+    await repo1.dispatch({ type: 'buyKit', childId: 'theodore', projectId: 'road', kitPurchaseId: 'k1' })
     const repo2 = new LocalStorageRepository(storage, commandDeps)
     expect(repo2.load()).toEqual(repo1.load())
   })
@@ -61,31 +66,31 @@ describe('LocalStorageRepository', () => {
     const storage = new FakeStorage()
     storage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 99, children: {} }))
     const repo = new LocalStorageRepository(storage, commandDeps)
-    expect(repo.load().schemaVersion).toBe(2)
+    expect(repo.load().schemaVersion).toBe(3)
     expect(storage.dump().some((k) => k.includes('corrupt'))).toBe(true)
   })
 
-  it('dispatch re-reads storage: a stale tab cannot double-spend or drop approvals', () => {
+  it('dispatch re-reads storage: a stale tab cannot double-spend or drop approvals', async () => {
     const storage = new FakeStorage()
     const repoA = new LocalStorageRepository(storage, commandDeps)
     const repoB = new LocalStorageRepository(storage, commandDeps) // never gets storage events
 
     // A approves a claim, then A buys the hat (coins 30 → 10)
-    repoA.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'c1' })
-    repoA.dispatch({ type: 'approveClaim', claimId: 'c1' })
-    repoA.dispatch({ type: 'purchase', childId: 'theodore', itemId: 'hat-leaf', purchaseId: 'pA' })
+    await repoA.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'c1' })
+    await repoA.dispatch({ type: 'approveClaim', claimId: 'c1' })
+    await repoA.dispatch({ type: 'purchase', childId: 'theodore', itemId: 'hat-leaf', purchaseId: 'pA' })
     expect(repoA.load().children.theodore.coins).toBe(10)
 
     // Stale B (still holding 20 coins, no hat) tries to buy the same hat:
     // must fail already-owned — coins must NOT go 10 → -10.
-    const r = repoB.dispatch({ type: 'purchase', childId: 'theodore', itemId: 'hat-leaf', purchaseId: 'pB' })
+    const r = await repoB.dispatch({ type: 'purchase', childId: 'theodore', itemId: 'hat-leaf', purchaseId: 'pB' })
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.error.code).toBe('already-owned')
     const stored = JSON.parse(storage.getItem(STORAGE_KEY)!)
     expect(stored.children.theodore.coins).toBe(10)
 
     // B dispatches something unrelated — A's award and purchase survive.
-    repoB.dispatch({ type: 'setWish', childId: 'leonard', itemId: 'hat-leaf' })
+    await repoB.dispatch({ type: 'setWish', childId: 'leonard', itemId: 'hat-leaf' })
     const stored2 = JSON.parse(storage.getItem(STORAGE_KEY)!)
     expect(stored2.children.theodore.coins).toBe(10)
     expect(stored2.children.theodore.inventory).toContain('hat-leaf')
@@ -93,7 +98,37 @@ describe('LocalStorageRepository', () => {
     expect(stored2.claims.c1.status).toBe('approved')
   })
 
-  it('migrates a v1 save to v2 without the corrupt-backup path', () => {
+  it('two stale repos racing for the final road kit: only one succeeds', async () => {
+    const storage = new FakeStorage()
+    const repoA = new LocalStorageRepository(storage, commandDeps)
+    const repoB = new LocalStorageRepository(storage, commandDeps)
+
+    // Theodore gets 10 more coins, Leonard keeps his 20.
+    await repoA.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'c1' })
+    await repoA.dispatch({ type: 'approveClaim', claimId: 'c1' })
+    await repoA.dispatch({ type: 'buyKit', childId: 'theodore', projectId: 'road', kitPurchaseId: 'k1' })
+    expect(repoA.load().city.projects.road.kits).toBe(1)
+
+    // Stale B (sees 0 kits) buys the final kit → road opens.
+    const win = await repoB.dispatch({ type: 'buyKit', childId: 'leonard', projectId: 'road', kitPurchaseId: 'k2' })
+    expect(win.ok).toBe(true)
+    expect(repoB.load().city.projects.road.status).toBe('open')
+    expect(repoB.load().city.currentProjectId).toBe('library')
+
+    // Now stale A still thinks the road needs kits — its buy must fail and
+    // keep its coins (Theodore has 20 left after buying kit k1... 30-10=20).
+    const lose = await repoA.dispatch({ type: 'buyKit', childId: 'theodore', projectId: 'road', kitPurchaseId: 'k3' })
+    expect(lose.ok).toBe(false)
+    if (!lose.ok) {
+      expect(['not-current-project', 'project-complete']).toContain(lose.error.code)
+    }
+    const stored = JSON.parse(storage.getItem(STORAGE_KEY)!)
+    expect(stored.children.theodore.coins).toBe(20)
+    expect(stored.children.leonard.coins).toBe(10)
+    expect(stored.city.projects.road.kits).toBe(2)
+  })
+
+  it('migrates a v1 save to v3 without the corrupt-backup path', () => {
     const storage = new FakeStorage()
     const v1 = {
       schemaVersion: 1,
@@ -112,7 +147,7 @@ describe('LocalStorageRepository', () => {
     storage.setItem(STORAGE_KEY, JSON.stringify(v1))
     const repo = new LocalStorageRepository(storage, commandDeps)
     const s = repo.load()
-    expect(s.schemaVersion).toBe(2)
+    expect(s.schemaVersion).toBe(3)
     expect(s.createdAt).toBe('2026-09-01T08:00:00.000Z') // earliest ledger entry
     expect(s.children.theodore.coins).toBe(33)
     expect(s.children.theodore.inventory).toContain('hat-leaf')
@@ -120,23 +155,62 @@ describe('LocalStorageRepository', () => {
     expect(s.children.theodore.league.evaluatedWeeks).toEqual({})
     expect(s.settings.sound).toBe(true)
     expect(s.parentPinHash).toBe('abc123')
+    // city: fresh town + founders' keepsake (2 stars → 2 planks)
+    expect(s.city.currentProjectId).toBe('road')
+    expect(s.city.foundersBridgePlanks).toBe(2)
     // no corrupt backup was made
     expect(storage.dump().some((k) => k.includes('corrupt'))).toBe(false)
   })
 
-  it('notifies subscribers on successful dispatch but not on failure', () => {
+  it('migrates a v2 save to v3 and freezes the star-bridge as a keepsake', () => {
+    const storage = new FakeStorage()
+    const child = (coins: number, stars: number) => ({
+      coins,
+      stars,
+      inventory: ['toy-train'],
+      equipped: { hat: null, toy: 'toy-train' },
+      wishItem: null,
+      league: { rank: 3, evaluatedWeeks: { '2026-10-05': { promoted: true } }, unseenPromotion: null },
+    })
+    const v2 = {
+      schemaVersion: 2,
+      createdAt: '2026-10-05T09:00:00.000Z',
+      children: { theodore: child(45, 4), leonard: child(20, 3) },
+      claims: {},
+      purchases: {},
+      ledger: [
+        { id: 'welcome-theodore', childId: 'theodore', coins: 20, stars: 0, reason: 'welcome', refId: 'welcome', at: '2026-10-05T09:00:00.000Z' },
+      ],
+      parentPinHash: 'def456',
+      settings: { sound: false },
+    }
+    storage.setItem(STORAGE_KEY, JSON.stringify(v2))
+    const repo = new LocalStorageRepository(storage, commandDeps)
+    const s = repo.load()
+    expect(s.schemaVersion).toBe(3)
+    expect(s.children.theodore.coins).toBe(45)
+    expect(s.children.theodore.league.rank).toBe(3)
+    expect(s.children.theodore.league.evaluatedWeeks['2026-10-05']).toEqual({ promoted: true })
+    expect(s.settings.sound).toBe(false)
+    expect(s.city.foundersBridgePlanks).toBe(7) // 4 + 3 stars, capped at 12
+    expect(s.city.projects.road).toEqual({ kits: 0, status: 'building' })
+    expect(s.city.currentProjectId).toBe('road')
+    expect(storage.dump().some((k) => k.includes('corrupt'))).toBe(false)
+  })
+
+  it('notifies subscribers on successful dispatch but not on failure', async () => {
     const storage = new FakeStorage()
     const repo = new LocalStorageRepository(storage, commandDeps)
     let calls = 0
     const unsub = repo.subscribe(() => {
       calls += 1
     })
-    repo.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'c1' })
+    await repo.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'c1' })
     expect(calls).toBe(1)
-    repo.dispatch({ type: 'approveClaim', claimId: 'nope' })
+    await repo.dispatch({ type: 'approveClaim', claimId: 'nope' })
     expect(calls).toBe(1)
     unsub()
-    repo.dispatch({ type: 'approveClaim', claimId: 'c1' })
+    await repo.dispatch({ type: 'approveClaim', claimId: 'c1' })
     expect(calls).toBe(1)
   })
 })

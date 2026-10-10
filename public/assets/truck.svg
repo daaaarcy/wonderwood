@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 90">
+  <ellipse cx="70" cy="86" rx="58" ry="4" fill="#3c3c3c" opacity="0.08"/>
+  <!-- cargo box -->
+  <rect x="8" y="18" width="78" height="48" rx="10" fill="#ffffff"/>
+  <rect x="8" y="18" width="78" height="48" rx="10" fill="none" stroke="#e5e5e5" stroke-width="3"/>
+  <rect x="8" y="54" width="78" height="12" rx="6" fill="#58cc02"/>
+  <!-- cab -->
+  <rect x="86" y="30" width="42" height="36" rx="9" fill="#58cc02"/>
+  <rect x="98" y="36" width="22" height="18" rx="5" fill="#eafbff"/>
+  <rect x="86" y="58" width="46" height="8" rx="4" fill="#58a700"/>
+  <!-- kit in the bed -->
+  <rect x="20" y="26" width="30" height="24" rx="5" fill="#c98a5a"/>
+  <path d="M35 26 v24" stroke="#a06a42" stroke-width="3"/>
+  <path d="M20 26 q15 -10 30 0" fill="#e0a76f"/>
+  <!-- wheels -->
+  <circle cx="30" cy="70" r="11" fill="#3c3c3c"/><circle cx="30" cy="70" r="5" fill="#afafaf"/>
+  <circle cx="72" cy="70" r="11" fill="#3c3c3c"/><circle cx="72" cy="70" r="5" fill="#afafaf"/>
+  <circle cx="110" cy="70" r="11" fill="#3c3c3c"/><circle cx="110" cy="70" r="5" fill="#afafaf"/>
+</svg>

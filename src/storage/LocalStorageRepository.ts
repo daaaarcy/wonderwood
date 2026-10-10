@@ -1,6 +1,6 @@
 import { applyCommand } from '../domain/commands'
 import { initialState } from '../domain/state'
-import type { Command, CommandDeps, GameState, Result } from '../domain/types'
+import type { CityState, Command, CommandDeps, GameState, Result } from '../domain/types'
 import type { GameRepository } from './GameRepository'
 
 export const STORAGE_KEY = 'wonderwood:v1'
@@ -24,7 +24,7 @@ function isValidV1(value: Record<string, unknown>): boolean {
 
 function isValidV2(value: Record<string, unknown>): boolean {
   if (!isValidV1(value)) return false
-  const s = value as unknown as GameState
+  const s = value as unknown as GameStateV2
   if (typeof s.createdAt !== 'string') return false
   for (const id of ['theodore', 'leonard'] as const) {
     const league = s.children[id].league
@@ -38,15 +38,55 @@ function isValidV2(value: Record<string, unknown>): boolean {
   return true
 }
 
+function isValidV3(value: Record<string, unknown>): boolean {
+  if (!isValidV2(value)) return false
+  const s = value as unknown as GameState
+  const city = s.city
+  if (typeof city !== 'object' || city === null) return false
+  if (typeof city.projects !== 'object' || city.projects === null) return false
+  for (const id of ['road', 'library', 'music-school', 'police-station', 'hospital'] as const) {
+    const p = city.projects[id]
+    if (!p || typeof p.kits !== 'number' || typeof p.status !== 'string') return false
+  }
+  if (typeof city.kitPurchases !== 'object' || city.kitPurchases === null) return false
+  return true
+}
+
+/** Fresh city block used by v2→v3 migration and initial state. */
+function initialCity(foundersBridgePlanks: number): CityState {
+  return {
+    currentProjectId: 'road',
+    suggestedProjectId: null,
+    projects: {
+      road: { kits: 0, status: 'building' },
+      library: { kits: 0, status: 'locked' },
+      'music-school': { kits: 0, status: 'locked' },
+      'police-station': { kits: 0, status: 'locked' },
+      hospital: { kits: 0, status: 'locked' },
+    },
+    kitPurchases: {},
+    foundersBridgePlanks,
+  }
+}
+
+/** v2 → v3: preserve everything; the old star-bridge becomes a keepsake. */
+function migrateV2(v2: GameStateV2): GameState {
+  const planks = Math.min(12, v2.children.theodore.stars + v2.children.leonard.stars)
+  return { ...v2, schemaVersion: 3, city: initialCity(planks) }
+}
+
+/** v2 shape: same as v3 minus the city block. */
+type GameStateV2 = Omit<GameState, 'schemaVersion' | 'city'> & { schemaVersion: 2 }
+
 /** v1 → v2: preserve everything; league starts at rank 1, sound on. */
-function migrateV1(v1: Record<string, unknown>): GameState | null {
+function migrateV1(v1: Record<string, unknown>): GameStateV2 | null {
   if (!isValidV1(v1)) return null
-  const s = v1 as unknown as Omit<GameState, 'schemaVersion' | 'createdAt' | 'settings'>
+  const s = v1 as unknown as Omit<GameStateV2, 'schemaVersion' | 'createdAt' | 'settings'>
   const createdAt =
     s.ledger.length > 0
       ? s.ledger.map((e: { at: string }) => e.at).sort()[0]
       : new Date().toISOString()
-  return {
+  const v2: GameStateV2 = {
     schemaVersion: 2,
     createdAt,
     children: {
@@ -59,6 +99,7 @@ function migrateV1(v1: Record<string, unknown>): GameState | null {
     parentPinHash: typeof s.parentPinHash === 'string' ? s.parentPinHash : null,
     settings: { sound: true },
   }
+  return v2
 }
 
 /** Parse raw JSON → current-schema GameState (migrating v1), or null. */
@@ -67,8 +108,15 @@ export function parseStoredState(raw: string): GameState | null {
     const value: unknown = JSON.parse(raw)
     if (typeof value !== 'object' || value === null) return null
     const version = (value as { schemaVersion?: unknown }).schemaVersion
-    if (version === 2) return isValidV2(value as Record<string, unknown>) ? (value as GameState) : null
-    if (version === 1) return migrateV1(value as Record<string, unknown>)
+    if (version === 3) return isValidV3(value as Record<string, unknown>) ? (value as GameState) : null
+    if (version === 2) {
+      const v2 = isValidV2(value as Record<string, unknown>) ? (value as unknown as GameStateV2) : null
+      return v2 ? migrateV2(v2) : null
+    }
+    if (version === 1) {
+      const v2 = migrateV1(value as Record<string, unknown>)
+      return v2 ? migrateV2(v2) : null
+    }
     return null
   } catch {
     return null
@@ -142,7 +190,7 @@ export class LocalStorageRepository implements GameRepository {
     return this.state
   }
 
-  dispatch(cmd: Command): Result<unknown> {
+  dispatch(cmd: Command): Promise<Result<unknown>> {
     // Re-read first: another tab may have written since our last storage event
     // (events are async). Applying to stale state could drop an approval or
     // double-spend coins. Missing/invalid → fall back to in-memory.
@@ -153,7 +201,7 @@ export class LocalStorageRepository implements GameRepository {
       this.persist()
       this.emit()
     }
-    return result
+    return Promise.resolve(result)
   }
 
   subscribe(listener: () => void): () => void {
