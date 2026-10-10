@@ -26,11 +26,15 @@ Checks: `npm run typecheck`, `npm run lint`, `npm run test`, `npm run e2e`.
 
 See [AGENTS.md](./AGENTS.md) for architecture notes.
 
-## Deploy (Cloudflare Pages)
+## Deploy (Cloudflare)
 
-The app is fully static — `dist/` is the whole site, service worker included.
+The app is a static site in `dist/` (service worker included). `wrangler.jsonc`
+serves `dist` as Workers static assets, so it deploys via either Cloudflare
+Workers Builds (Git connect: build `npm run build`, deploy `npx wrangler
+deploy`) or Pages (build `npm run build`, output `dist`).
 
-- **Build command:** `npm run build`
-- **Output directory:** `dist`
+- Build-time env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`
+  (safe to expose), `NODE_VERSION=22`. Never the secret/access keys.
+- After deploy, allow the origin on the edge function:
+  `npx supabase secrets set APP_ORIGIN=https://<site> --project-ref <ref>`
 - No routing config needed (single-page, state-based navigation).
-- Node version: 20+ (`.nvmrc`-less; set `NODE_VERSION` env var if needed).
