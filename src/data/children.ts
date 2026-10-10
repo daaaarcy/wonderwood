@@ -22,20 +22,20 @@ export const CHILDREN: Record<ChildId, ChildDef> = {
   theodore: {
     id: 'theodore',
     name: 'Theodore',
-    color: '#2e9e8f',
-    darkColor: '#1f7a6e',
+    color: '#1cb0f6',
+    darkColor: '#1899d6',
     explorerKey: 'explorer-theodore',
     treehouseKey: 'treehouse-theodore',
-    headAnchor: { x: 100, y: 24 },
+    headAnchor: { x: 100, y: 20 },
   },
   leonard: {
     id: 'leonard',
     name: 'Leonard',
-    color: '#f2a03d',
-    darkColor: '#c9761a',
+    color: '#ff9600',
+    darkColor: '#e08600',
     explorerKey: 'explorer-leonard',
     treehouseKey: 'treehouse-leonard',
-    headAnchor: { x: 100, y: 24 },
+    headAnchor: { x: 100, y: 20 },
   },
 }
 

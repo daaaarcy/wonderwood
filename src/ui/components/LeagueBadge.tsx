@@ -1,7 +1,6 @@
 import { useId } from 'react'
 import { leagueByRank } from '../../data/leagues'
 
-const OUTLINE = '#4a3226'
 
 interface Props {
   rank: number
@@ -48,11 +47,11 @@ function ShieldBadge({ rank, uid }: { rank: number; uid: string }) {
           <stop offset="1" stopColor={rank === 1 ? '#e8e2d8' : shade(league.color, -0.25)} />
         </linearGradient>
       </defs>
-      <path d={shield} fill={`url(#${uid}-shield)`} stroke={OUTLINE} strokeWidth="4" strokeLinejoin="round" />
+      <path d={shield} fill={`url(#${uid}-shield)`} stroke={rank === 1 ? '#cfcfcf' : shade(league.color, -0.35)} strokeWidth="4" strokeLinejoin="round" />
       {rank === 1 && (
         <>
           <ellipse cx="44" cy="38" rx="16" ry="10" fill="#ffffff" opacity="0.85" transform="rotate(-18 44 38)" />
-          <path d="M34 84 q26 14 52 0" fill="none" stroke="#b9ab98" strokeWidth="4" strokeLinecap="round" opacity="0.7" />
+          <path d="M30 78 q30 18 60 0 l0 8 q-30 16 -60 0 z" fill="#e5e5e5" />
         </>
       )}
       {rank === 2 && (
@@ -91,7 +90,7 @@ function MedalBadge({ rank, uid }: { rank: number; uid: string }) {
           <stop offset="1" stopColor={shade(league.color, -0.3)} />
         </radialGradient>
       </defs>
-      <circle cx="60" cy="60" r="48" fill={`url(#${uid}-metal)`} stroke={OUTLINE} strokeWidth="4" />
+      <circle cx="60" cy="60" r="48" fill={`url(#${uid}-metal)`} stroke={shade(league.color, -0.35)} strokeWidth="4" />
       <circle cx="60" cy="60" r="38" fill="none" stroke={shade(league.color, -0.35)} strokeWidth="3" />
       {/* rim studs */}
       {[0, 60, 120, 180, 240, 300].map((a) => (
@@ -107,7 +106,7 @@ function MedalBadge({ rank, uid }: { rank: number; uid: string }) {
       <path
         d="M60 34 l7.4 15.6 17 2.1 -12.5 11.6 3.2 16.8 -15.1 -8.4 -15.1 8.4 3.2 -16.8 -12.5 -11.6 17 -2.1 z"
         fill={lighten(league.color, 0.25)}
-        stroke={shade(league.color, -0.45)}
+        stroke={shade(league.color, -0.4)}
         strokeWidth="3"
         strokeLinejoin="round"
       />
@@ -137,9 +136,9 @@ function GemBadge({ rank, uid, ornate }: { rank: number; uid: string; ornate: bo
         </linearGradient>
       </defs>
       {/* gold setting */}
-      <circle cx="60" cy="60" r={ornate ? 52 : 48} fill={`url(#${uid}-gold)`} stroke={OUTLINE} strokeWidth="4" />
+      <circle cx="60" cy="60" r={ornate ? 52 : 48} fill={`url(#${uid}-gold)`} stroke="#b8860b" strokeWidth="4" />
       {ornate && (
-        <g fill={gold} stroke={OUTLINE} strokeWidth="2.5">
+        <g fill={gold} stroke="#b8860b" strokeWidth="2.5">
           {[45, 135, 225, 315].map((a) => (
             <circle
               key={a}
@@ -150,12 +149,12 @@ function GemBadge({ rank, uid, ornate }: { rank: number; uid: string; ornate: bo
           ))}
         </g>
       )}
-      <circle cx="60" cy="60" r={ornate ? 42 : 38} fill={OUTLINE} opacity="0.9" />
+      <circle cx="60" cy="60" r={ornate ? 42 : 38} fill="#8a6a3a" />
       {/* faceted gem */}
       <path
         d="M60 22 L86 40 L92 60 L78 90 L42 90 L28 60 L34 40 Z"
         fill={`url(#${uid}-gem)`}
-        stroke={OUTLINE}
+        stroke={gem.edge}
         strokeWidth="3"
         strokeLinejoin="round"
       />
@@ -187,7 +186,7 @@ function DiamondBadge({ rank, uid }: { rank: number; uid: string }) {
         </linearGradient>
       </defs>
       {/* laurel branches */}
-      <g fill="#5bb85c" stroke={OUTLINE} strokeWidth="2">
+      <g fill="#58cc02" stroke="#46a302" strokeWidth="1.5">
         {[0, 1, 2, 3].map((i) => (
           <ellipse key={`l${i}`} cx={16 + i * 2} cy={78 - i * 14} rx="4.5" ry="9" transform={`rotate(-30 ${16 + i * 2} ${78 - i * 14})`} />
         ))}
@@ -196,22 +195,22 @@ function DiamondBadge({ rank, uid }: { rank: number; uid: string }) {
         ))}
       </g>
       {/* crown */}
-      <path d="M40 16 l10 10 10 -12 10 12 10 -10 4 16 h-48 z" fill="#d5ac57" stroke={OUTLINE} strokeWidth="3" strokeLinejoin="round" />
+      <path d="M40 16 l10 10 10 -12 10 12 10 -10 4 16 h-48 z" fill="#d5ac57" stroke="#b8860b" strokeWidth="2.5" strokeLinejoin="round" />
       {/* brilliant-cut diamond */}
       <path
         d="M30 46 L48 34 L72 34 L90 46 L60 96 Z"
         fill={`url(#${uid}-diamond)`}
-        stroke={OUTLINE}
-        strokeWidth="3.5"
+        stroke={shade(league.color, -0.3)}
+        strokeWidth="3"
         strokeLinejoin="round"
       />
       <path d="M30 46 L60 96 L48 34 M30 46 L90 46 M72 34 L60 96 M48 34 L60 46 L72 34" fill="none" stroke="#ffffff" strokeWidth="1.8" opacity="0.65" />
       <ellipse cx="48" cy="42" rx="9" ry="4" fill="#ffffff" opacity="0.8" transform="rotate(-15 48 42)" />
       {/* sparkles */}
       <g className="badge-sparkles">
-        <path d="M20 30 l2.5 5 5 2.5 -5 2.5 -2.5 5 -2.5 -5 -5 -2.5 5 -2.5 z" fill="#fff7e8" stroke={OUTLINE} strokeWidth="1.5" />
-        <path d="M98 60 l2 4 4 2 -4 2 -2 4 -2 -4 -4 -2 4 -2 z" fill="#fff7e8" stroke={OUTLINE} strokeWidth="1.5" />
-        <path d="M92 18 l1.8 3.6 3.6 1.8 -3.6 1.8 -1.8 3.6 -1.8 -3.6 -3.6 -1.8 3.6 -1.8 z" fill="#ffd93d" stroke={OUTLINE} strokeWidth="1.2" />
+        <path d="M20 30 l2.5 5 5 2.5 -5 2.5 -2.5 5 -2.5 -5 -5 -2.5 5 -2.5 z" fill="#fff7e8" stroke="#e5b400" strokeWidth="1.5" />
+        <path d="M98 60 l2 4 4 2 -4 2 -2 4 -2 -4 -4 -2 4 -2 z" fill="#fff7e8" stroke="#e5b400" strokeWidth="1.5" />
+        <path d="M92 18 l1.8 3.6 3.6 1.8 -3.6 1.8 -1.8 3.6 -1.8 -3.6 -3.6 -1.8 3.6 -1.8 z" fill="#ffc800" stroke="#e5b400" strokeWidth="1.2" />
       </g>
     </g>
   )

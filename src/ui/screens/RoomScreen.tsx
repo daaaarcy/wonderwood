@@ -5,9 +5,8 @@ import { assetUrl } from '../../game/assets'
 import { EventBus } from '../../game/EventBus'
 import { PhaserGame } from '../../game/PhaserGame'
 import { useGameState, useRepository } from '../../storage/hooks'
-import { CharacterAvatar } from '../components/CharacterAvatar'
 
-export function RoomScreen({ childId, onBack }: { childId: ChildId; onBack: () => void }) {
+export function RoomScreen({ childId }: { childId: ChildId }) {
   const state = useGameState()
   const repo = useRepository()
   const child = state.children[childId]
@@ -37,18 +36,7 @@ export function RoomScreen({ childId, onBack }: { childId: ChildId; onBack: () =
 
   return (
     <div className="screen room-screen">
-      <header className="home-header">
-        <div className="header-id">
-          <CharacterAvatar childId={childId} hatItemId={child.equipped.hat} size={56} />
-          <span className="header-name">{def.name}&rsquo;s room</span>
-        </div>
-        <nav className="header-nav">
-          <button className="btn btn-small btn-ghost" onClick={onBack}>
-            Back
-          </button>
-        </nav>
-      </header>
-
+      <h2 className="screen-title">{def.name}&rsquo;s room</h2>
       <div className="room-wrap">
         <PhaserGame scene="room" onSceneReady={setSceneReady} />
       </div>

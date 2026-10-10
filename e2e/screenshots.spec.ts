@@ -48,7 +48,8 @@ test('capture the Stage 1 screens', async ({ page }, testInfo) => {
     .locator('.quest-card', { hasText: 'Do your Duolingo lesson' })
     .getByRole('button', { name: 'I did it!' })
     .click()
-  await page.getByRole('button', { name: 'Switch explorer' }).click()
+  await page.getByLabel('Explorer menu').click()
+  await page.getByRole('menuitem', { name: 'Switch explorer' }).click()
   await page.getByRole('button', { name: 'Grown-ups' }).click()
   for (const d of '1234') await page.getByRole('button', { name: `Digit ${d}` }).click()
   for (const d of '1234') await page.getByRole('button', { name: `Digit ${d}` }).click() // confirm
@@ -67,7 +68,6 @@ test('capture the Stage 1 screens', async ({ page }, testInfo) => {
   // buy + wear so the room shot shows the hat
   await page.getByRole('button', { name: 'Buy for 20 coins' }).click()
   await page.getByRole('button', { name: 'Wear it' }).click()
-  await page.getByRole('button', { name: 'Back' }).click()
   await page.getByRole('button', { name: 'My room' }).click()
   await expect(page.locator('[data-scene="room"][data-scene-ready="true"]')).toBeAttached()
   await page.getByRole('button', { name: 'Start train' }).click()

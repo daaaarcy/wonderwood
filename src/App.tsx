@@ -4,6 +4,7 @@ import { LEAGUES } from './data/leagues'
 import { RepositoryProvider } from './storage/repo-context'
 import { useRepository } from './storage/hooks'
 import { LeagueBadge } from './ui/components/LeagueBadge'
+import { ChildChrome, type ChildTab } from './ui/components/ChildChrome'
 import { ProfilePicker } from './ui/screens/ProfilePicker'
 import { ChildHome } from './ui/screens/ChildHome'
 import { Grownups } from './ui/screens/Grownups'
@@ -11,7 +12,7 @@ import { LeagueScreen } from './ui/screens/LeagueScreen'
 import { Shop } from './ui/screens/Shop'
 import { RoomScreen } from './ui/screens/RoomScreen'
 
-export type Screen = 'picker' | 'home' | 'shop' | 'room' | 'grownups' | 'league'
+export type Screen = 'picker' | 'grownups' | ChildTab
 
 function BadgeGallery() {
   return (
@@ -54,23 +55,13 @@ function Shell() {
   if (screen === 'grownups') {
     return <Grownups onExit={() => setScreen('picker')} />
   }
-  if (screen === 'shop') {
-    return <Shop childId={childId} onBack={() => setScreen('home')} />
-  }
-  if (screen === 'room') {
-    return <RoomScreen childId={childId} onBack={() => setScreen('home')} />
-  }
-  if (screen === 'league') {
-    return <LeagueScreen childId={childId} onBack={() => setScreen('home')} />
-  }
   return (
-    <ChildHome
-      childId={childId}
-      onShop={() => setScreen('shop')}
-      onRoom={() => setScreen('room')}
-      onLeague={() => setScreen('league')}
-      onSwitch={() => setScreen('picker')}
-    />
+    <ChildChrome childId={childId} tab={screen} onTab={setScreen} onSwitch={() => setScreen('picker')}>
+      {screen === 'shop' && <Shop childId={childId} />}
+      {screen === 'room' && <RoomScreen childId={childId} />}
+      {screen === 'league' && <LeagueScreen childId={childId} />}
+      {screen === 'home' && <ChildHome childId={childId} />}
+    </ChildChrome>
   )
 }
 

@@ -1,36 +1,62 @@
 /**
- * Wonderwood palette — warm picture-book colors.
+ * Wonderwood palette — flat, saturated, Duolingo-inspired.
  * The same hexes are used inside the hand-authored SVGs in public/assets,
  * so art and UI always match.
  */
 export const PALETTE = {
-  outline: '#4a3226', // warm dark brown — never pure black
+  // surfaces & text
+  white: '#ffffff',
+  bg: '#f7f7f7',
+  border: '#e5e5e5',
+  text: '#3c3c3c',
+  textSoft: '#777777',
+  disabled: '#afafaf',
+
+  // accent + darker "lip" used for the chunky 3D edge
+  green: '#58cc02',
+  greenLip: '#58a700',
+  blue: '#1cb0f6',
+  blueLip: '#1899d6',
+  yellow: '#ffc800',
+  yellowLip: '#e5b400',
+  orange: '#ff9600',
+  orangeLip: '#e08600',
+  red: '#ff4b4b',
+  redLip: '#ea2b2b',
+  purple: '#ce82ff',
+  purpleLip: '#a568cc',
+
+  // explorer identities
+  theodore: '#1cb0f6',
+  theodoreDark: '#1899d6',
+  leonard: '#ff9600',
+  leonardDark: '#e08600',
+
+  // nature (scenes only — UI stays neutral)
   skyTop: '#7ed6f2',
   skyBottom: '#eafbff',
-  sun: '#ffd93d',
+  sun: '#ffc800',
   cloud: '#ffffff',
   sea: '#4fb0d8',
-  seaDeep: '#2e86b8',
-  sand: '#f6e3ac',
-  grass: '#7fcb6e',
-  grassDark: '#57a94c',
-  leaf: '#5bb85c',
-  leafDark: '#3f9142',
-  trunk: '#8a5a3b',
-  wood: '#b07a4f',
-  woodDark: '#8a5a3b',
-  theodore: '#2e9e8f',
-  theodoreDark: '#1f7a6e',
-  leonard: '#f2a03d',
-  leonardDark: '#c9761a',
-  coin: '#f7c948',
-  coinEdge: '#d9a321',
-  star: '#ffd93d',
-  starEdge: '#e6a91c',
-  cream: '#fff7e8',
-  paper: '#fffdf6',
-  roof: '#e76f51',
-  rainbow: ['#f66d6d', '#f6a85e', '#f9dc5c', '#7fcb6e', '#5ba8e0', '#9b7ede'],
+  seaDeep: '#1899d6',
+  sand: '#ffd98e',
+  grass: '#58cc02',
+  grassDark: '#46a302',
+  leaf: '#58cc02',
+  leafDark: '#58a700',
+  trunk: '#96683f',
+  wood: '#c98a5a',
+  woodDark: '#a06a42',
+  skin: '#ffd3ac',
+  skinDark: '#f5bc8e',
+  hairBrown: '#7a4f33',
+  hairBrownDark: '#644027',
+  hairDark: '#3a2e28',
+  coin: '#ffc800',
+  coinEdge: '#e5b400',
+  star: '#ffc800',
+  starEdge: '#e5b400',
+  rainbow: ['#ff4b4b', '#ff9600', '#ffc800', '#58cc02', '#1cb0f6', '#ce82ff'],
 } as const
 
-export const FONT_FAMILY = "'Fredoka', ui-rounded, 'SF Pro Rounded', 'Comic Sans MS', system-ui, sans-serif"
+export const FONT_FAMILY = "'Nunito', ui-rounded, 'SF Pro Rounded', system-ui, sans-serif"

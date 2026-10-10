@@ -4,7 +4,11 @@
  */
 export const ASSET_FILES = {
   'explorer-theodore': 'assets/explorer-theodore.svg',
+  'explorer-theodore-blink': 'assets/explorer-theodore-blink.svg',
+  'explorer-theodore-cheer': 'assets/explorer-theodore-cheer.svg',
   'explorer-leonard': 'assets/explorer-leonard.svg',
+  'explorer-leonard-blink': 'assets/explorer-leonard-blink.svg',
+  'explorer-leonard-cheer': 'assets/explorer-leonard-cheer.svg',
   'hat-leaf': 'assets/hat-leaf.svg',
   'toy-train': 'assets/toy-train.svg',
   'island-bg': 'assets/island-bg.svg',

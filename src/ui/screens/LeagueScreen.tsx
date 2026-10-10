@@ -5,9 +5,8 @@ import { CHILDREN, CHILD_LIST } from '../../data/children'
 import { LEAGUES, leagueTitle } from '../../data/leagues'
 import { useGameState } from '../../storage/hooks'
 import { LeagueBadge } from '../components/LeagueBadge'
-import { CharacterAvatar } from '../components/CharacterAvatar'
 
-export function LeagueScreen({ childId, onBack }: { childId: ChildId; onBack: () => void }) {
+export function LeagueScreen({ childId }: { childId: ChildId }) {
   const state = useGameState()
   const child = state.children[childId]
   const def = CHILDREN[childId]
@@ -23,18 +22,7 @@ export function LeagueScreen({ childId, onBack }: { childId: ChildId; onBack: ()
 
   return (
     <div className="screen league-screen">
-      <header className="home-header">
-        <div className="header-id">
-          <CharacterAvatar childId={childId} hatItemId={child.equipped.hat} size={48} />
-          <span className="header-name">{def.name}&rsquo;s league</span>
-        </div>
-        <nav className="header-nav">
-          <button className="btn btn-small btn-ghost" onClick={onBack}>
-            Back
-          </button>
-        </nav>
-      </header>
-
+      <h2 className="screen-title">{def.name}&rsquo;s league</h2>
       <section className="panel league-hero">
         <LeagueBadge rank={rank} size={140} animated />
         <h2 className="league-name" style={{ color: def.darkColor }}>

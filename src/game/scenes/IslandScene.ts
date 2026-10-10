@@ -3,7 +3,6 @@ import { EventBus } from '../EventBus'
 import { GAME_HEIGHT, GAME_WIDTH } from '../assets'
 import { CHILDREN } from '../../data/children'
 import { itemById } from '../../data/catalogue'
-import { PALETTE } from '../../ui/theme'
 import type { ChildId } from '../../domain/types'
 
 export interface IslandStatePayload {
@@ -51,7 +50,9 @@ export class IslandScene extends Phaser.Scene {
     this.load.svg('treehouse-theodore', 'assets/treehouse-theodore.svg', { width: 360, height: 440 })
     this.load.svg('treehouse-leonard', 'assets/treehouse-leonard.svg', { width: 360, height: 440 })
     this.load.svg('explorer-theodore', 'assets/explorer-theodore.svg', { width: 400, height: 480 })
+    this.load.svg('explorer-theodore-blink', 'assets/explorer-theodore-blink.svg', { width: 400, height: 480 })
     this.load.svg('explorer-leonard', 'assets/explorer-leonard.svg', { width: 400, height: 480 })
+    this.load.svg('explorer-leonard-blink', 'assets/explorer-leonard-blink.svg', { width: 400, height: 480 })
     this.load.svg('hat-leaf', 'assets/hat-leaf.svg', { width: 240, height: 180 })
     this.load.svg('bridge-plank', 'assets/bridge-plank.svg', { width: 128, height: 56 })
     this.load.svg('star', 'assets/star.svg', { width: 96, height: 96 })
@@ -67,6 +68,7 @@ export class IslandScene extends Phaser.Scene {
     this.buildBridge()
     this.buildExplorers()
     this.buildBanner()
+    this.startBlinkLoop()
 
     EventBus.on('island-state', this.applyState, this)
     // game.destroy() fires DESTROY rather than SHUTDOWN — listen for both so a
@@ -87,12 +89,12 @@ export class IslandScene extends Phaser.Scene {
     )
     // soft glow so the bridge reads as the scene's focus
     const glow = this.add.graphics()
-    glow.fillStyle(0xfff7e8, 0.35)
+    glow.fillStyle(0xffffff, 0.35)
     glow.fillEllipse(500, 468, 300, 190)
 
     // rainbow arcs rising above the planks (the bridge's magic)
     this.rainbow = this.add.graphics()
-    const colors = [0x5ba8e0, 0xf9dc5c, 0xf66d6d]
+    const colors = [0x1cb0f6, 0xffc800, 0xff4b4b]
     colors.forEach((color, i) => {
       const lift = 52 + i * 20
       const arc = new Phaser.Curves.QuadraticBezier(
@@ -130,7 +132,7 @@ export class IslandScene extends Phaser.Scene {
 
   private drawDashedRect(cx: number, cy: number, angleDeg: number, w: number, h: number) {
     const g = this.slotGraphics
-    g.lineStyle(2.5, 0x4a3226, 0.45)
+    g.lineStyle(2.5, 0xffffff, 0.85)
     const a = Phaser.Math.DegToRad(angleDeg)
     const cos = Math.cos(a)
     const sin = Math.sin(a)
@@ -209,6 +211,24 @@ export class IslandScene extends Phaser.Scene {
     }
   }
 
+  /** Idle blinking: swap to the closed-eyes texture briefly every few seconds. */
+  private startBlinkLoop() {
+    this.time.addEvent({
+      delay: 3200,
+      loop: true,
+      callback: () => {
+        for (const id of ['theodore', 'leonard'] as const) {
+          const body = this.explorers[id]?.getData('body') as Phaser.GameObjects.Image | undefined
+          if (!body) continue
+          body.setTexture(`${id === 'theodore' ? 'explorer-theodore' : 'explorer-leonard'}-blink`)
+          this.time.delayedCall(140, () => {
+            if (body.scene) body.setTexture(id === 'theodore' ? 'explorer-theodore' : 'explorer-leonard')
+          })
+        }
+      },
+    })
+  }
+
   private setHat(childId: ChildId, itemId: string | null) {
     const outer = this.explorers[childId]
     const bobber = outer.getData('bobber') as Phaser.GameObjects.Container
@@ -237,23 +257,22 @@ export class IslandScene extends Phaser.Scene {
   private buildBanner() {
     const g = this.add.graphics()
     // string of pennant flags above the bridge
-    g.lineStyle(3, 0x4a3226, 0.9)
+    g.lineStyle(3, 0xffffff, 0.9)
     g.lineBetween(360, 330, 640, 330)
-    const flagColors = [0xf66d6d, 0xf9dc5c, 0x7fcb6e, 0x5ba8e0, 0x9b7ede, 0xf2a03d, 0xf66d6d, 0x7fcb6e]
+    const flagColors = [0xff4b4b, 0xffc800, 0x58cc02, 0x1cb0f6, 0xce82ff, 0xff9600, 0xff4b4b, 0x58cc02]
     flagColors.forEach((c, i) => {
       const x = 375 + i * 36
       g.fillStyle(c, 1)
       g.fillTriangle(x - 12, 330, x + 12, 330, x, 356)
-      g.lineStyle(2.5, 0x4a3226, 1)
-      g.strokeTriangle(x - 12, 330, x + 12, 330, x, 356)
     })
     const label = this.add
       .text(500, 296, 'Rainbow Bridge!', {
-        fontFamily: "Fredoka, ui-rounded, 'Comic Sans MS', sans-serif",
+        fontFamily: "'Nunito', ui-rounded, sans-serif",
         fontSize: '30px',
-        color: PALETTE.outline,
-        backgroundColor: '#fff7e8dd',
-        padding: { x: 14, y: 6 },
+        fontStyle: '800',
+        color: '#3c3c3c',
+        backgroundColor: '#ffffffee',
+        padding: { x: 16, y: 8 },
       })
       .setOrigin(0.5)
     this.banner = this.add.container(0, 0, [g, label])

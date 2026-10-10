@@ -6,7 +6,7 @@ import { assetUrl } from '../../game/assets'
 import { useGameState, useRepository } from '../../storage/hooks'
 import { CharacterAvatar } from '../components/CharacterAvatar'
 
-export function Shop({ childId, onBack }: { childId: ChildId; onBack: () => void }) {
+export function Shop({ childId }: { childId: ChildId }) {
   const state = useGameState()
   const repo = useRepository()
   const child = state.children[childId]
@@ -21,22 +21,7 @@ export function Shop({ childId, onBack }: { childId: ChildId; onBack: () => void
 
   return (
     <div className="screen shop-screen">
-      <header className="home-header">
-        <div className="header-id">
-          <CharacterAvatar childId={childId} hatItemId={child.equipped.hat} size={56} />
-          <span className="header-name">{def.name}&rsquo;s shop</span>
-        </div>
-        <div className="coin-purse">
-          <img src={assetUrl('coin')} alt="" />
-          <span data-testid="coin-count">{child.coins}</span>
-        </div>
-        <nav className="header-nav">
-          <button className="btn btn-small btn-ghost" onClick={onBack}>
-            Back
-          </button>
-        </nav>
-      </header>
-
+      <h2 className="screen-title">{def.name}&rsquo;s shop</h2>
       <div className="shop-body">
         <div className="shop-preview panel">
           {selected?.slot === 'hat' ? (

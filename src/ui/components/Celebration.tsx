@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import type { ChildId } from '../../domain/types'
 import { assetUrl } from '../../game/assets'
 
 export interface CelebrationData {
@@ -11,7 +12,15 @@ export interface CelebrationData {
  * With prefers-reduced-motion the CSS swaps the animation for a
  * static highlight — this component always renders the same markup.
  */
-export function Celebration({ data, onDone }: { data: CelebrationData; onDone: () => void }) {
+export function Celebration({
+  childId,
+  data,
+  onDone,
+}: {
+  childId: ChildId
+  data: CelebrationData
+  onDone: () => void
+}) {
   useEffect(() => {
     const t = setTimeout(onDone, 3200)
     return () => clearTimeout(t)
@@ -20,6 +29,12 @@ export function Celebration({ data, onDone }: { data: CelebrationData; onDone: (
   return (
     <div className="celebration" role="status" onClick={onDone}>
       <div className="celebration-card">
+        <img
+          className="celebration-cheer"
+          src={assetUrl(`explorer-${childId}-cheer`)}
+          alt=""
+          aria-hidden="true"
+        />
         <div className="celebration-burst" aria-hidden="true">
           {[0, 1, 2, 3, 4].map((i) => (
             <img key={i} className={`fly-coin fly-coin-${i}`} src={assetUrl('coin')} alt="" />

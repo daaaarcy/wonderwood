@@ -1,5 +1,10 @@
 import { expect, test, type Page } from '@playwright/test'
 
+async function switchExplorer(page: Page) {
+  await page.getByLabel('Explorer menu').click()
+  await page.getByRole('menuitem', { name: 'Switch explorer' }).click()
+}
+
 async function pickExplorer(page: Page, name: 'Theodore' | 'Leonard') {
   await page.getByRole('button', { name }).click()
   await expect(page.locator('[data-scene="island"][data-scene-ready="true"]')).toBeAttached()
@@ -44,7 +49,7 @@ test('full loop: claim → approve → buy → room → persistence', async ({ p
   await expect(langCard.getByText('Waiting for a grown-up')).toBeVisible()
 
   // --- grown-ups: set PIN + approve ---
-  await page.getByRole('button', { name: 'Switch explorer' }).click()
+  await switchExplorer(page)
   await enterGrownups(page)
   const claimRow = page.locator('.pending-panel .claim-row', { hasText: 'Do your Duolingo lesson' })
   await expect(claimRow).toBeVisible()
@@ -68,8 +73,6 @@ test('full loop: claim → approve → buy → room → persistence', async ({ p
   await page.getByRole('button', { name: 'Buy for 20 coins' }).click()
   await expect(page.getByTestId('coin-count')).toHaveText('10')
   await expect(page.getByText('Owned', { exact: false }).first()).toBeVisible()
-  await page.getByRole('button', { name: 'Back' }).click()
-
   // --- room: wear hat + run the train ---
   await page.getByRole('button', { name: 'My room' }).click()
   await expect(page.locator('[data-scene="room"][data-scene-ready="true"]')).toBeAttached()
@@ -96,7 +99,7 @@ test('double-clicking Approve awards the quest only once', async ({ page }) => {
   await pickExplorer(page, 'Theodore')
   const card = page.locator('.quest-card', { hasText: 'Typing practice' })
   await card.getByRole('button', { name: 'I did it!' }).click()
-  await page.getByRole('button', { name: 'Switch explorer' }).click()
+  await switchExplorer(page)
   await enterGrownups(page)
   const row = page.locator('.pending-panel .claim-row', { hasText: 'Typing practice' })
   await row.getByRole('button', { name: 'Approve' }).dblclick()
@@ -117,7 +120,7 @@ test('claim → reject → re-claim → approve awards +10 once', async ({ page 
   await expect(card.getByText('Waiting for a grown-up')).toBeVisible()
 
   // grown-up rejects
-  await page.getByRole('button', { name: 'Switch explorer' }).click()
+  await switchExplorer(page)
   await enterGrownups(page)
   await page
     .locator('.pending-panel .claim-row')
@@ -131,7 +134,7 @@ test('claim → reject → re-claim → approve awards +10 once', async ({ page 
   await expect(card.getByText('Waiting for a grown-up')).toBeVisible()
 
   // approve → exactly +10 coins once
-  await page.getByRole('button', { name: 'Switch explorer' }).click()
+  await switchExplorer(page)
   await enterGrownups(page)
   await page
     .locator('.pending-panel .claim-row')

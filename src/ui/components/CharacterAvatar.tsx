@@ -9,6 +9,8 @@ interface Props {
   /** Pixel width of the avatar (height follows the 200x240 proportions). */
   size: number
   className?: string
+  /** Show just the head (stat bar / menus). */
+  headOnly?: boolean
 }
 
 /**
@@ -16,14 +18,17 @@ interface Props {
  * the child's headAnchor — the same anchor math the Phaser scenes use, so the
  * shop preview matches the game world.
  */
-export function CharacterAvatar({ childId, hatItemId, size, className }: Props) {
+export function CharacterAvatar({ childId, hatItemId, size, className, headOnly }: Props) {
   const def = CHILDREN[childId]
   const hat = hatItemId ? itemById(hatItemId) : undefined
   const anchor = hat?.anchor ?? { x: 0.5, y: 0.85 }
-  return (
+  const inner = (
     <div
       className={`avatar ${className ?? ''}`}
-      style={{ width: size, aspectRatio: `${EXPLORER_VIEWBOX.width} / ${EXPLORER_VIEWBOX.height}` }}
+      style={{
+        width: headOnly ? size * 1.5 : size,
+        aspectRatio: `${EXPLORER_VIEWBOX.width} / ${EXPLORER_VIEWBOX.height}`,
+      }}
     >
       <img
         className="avatar-body"
@@ -44,6 +49,12 @@ export function CharacterAvatar({ childId, hatItemId, size, className }: Props) 
           }}
         />
       )}
+    </div>
+  )
+  if (!headOnly) return inner
+  return (
+    <div className="avatar-crop" style={{ width: size, height: size }}>
+      {inner}
     </div>
   )
 }

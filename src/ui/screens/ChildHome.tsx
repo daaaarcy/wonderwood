@@ -10,8 +10,6 @@ import { EventBus } from '../../game/EventBus'
 import { PhaserGame } from '../../game/PhaserGame'
 import { useGameState, useRepository } from '../../storage/hooks'
 import { Celebration, type CelebrationData } from '../components/Celebration'
-import { CharacterAvatar } from '../components/CharacterAvatar'
-import { LeagueBadge } from '../components/LeagueBadge'
 import { PromotionOverlay } from '../components/PromotionOverlay'
 
 function speak(text: string) {
@@ -21,19 +19,7 @@ function speak(text: string) {
   }
 }
 
-export function ChildHome({
-  childId,
-  onShop,
-  onRoom,
-  onLeague,
-  onSwitch,
-}: {
-  childId: ChildId
-  onShop: () => void
-  onRoom: () => void
-  onLeague: () => void
-  onSwitch: () => void
-}) {
+export function ChildHome({ childId }: { childId: ChildId }) {
   const state = useGameState()
   const repo = useRepository()
   const child = state.children[childId]
@@ -90,29 +76,6 @@ export function ChildHome({
 
   return (
     <div className="screen home-screen" style={{ ['--accent' as string]: def.color }}>
-      <header className="home-header">
-        <div className="header-id">
-          <CharacterAvatar childId={childId} hatItemId={child.equipped.hat} size={56} />
-          <span className="header-name">{def.name}</span>
-          <button
-            className="badge-btn"
-            onClick={onLeague}
-            aria-label={`${def.name}'s league`}
-          >
-            <LeagueBadge rank={child.league.rank} size={40} />
-          </button>
-        </div>
-        <div className="coin-purse" aria-label={`${child.coins} coins`}>
-          <img src={assetUrl('coin')} alt="" />
-          <span data-testid="coin-count">{child.coins}</span>
-        </div>
-        <nav className="header-nav">
-          <button className="btn btn-small" onClick={onShop}>Shop</button>
-          <button className="btn btn-small" onClick={onRoom}>My room</button>
-          <button className="btn btn-small btn-ghost" onClick={onSwitch}>Switch explorer</button>
-        </nav>
-      </header>
-
       <div className="home-main">
         <div className="island-wrap">
           <PhaserGame scene="island" onSceneReady={setSceneReady} />
@@ -146,7 +109,20 @@ export function ChildHome({
               const status = today.find((t) => t.questId === quest.id)
               return (
                 <article key={quest.id} className={`quest-card quest-${status?.status ?? 'available'}`}>
-                  <img src={assetUrl(quest.iconKey)} alt="" className="quest-icon" />
+                  <span className={`quest-node node-${status?.status ?? 'available'}`}>
+                    <img src={assetUrl(quest.iconKey)} alt="" className="quest-icon" />
+                    {status?.status === 'pending' && (
+                      <svg className="node-mark" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" fill="none" stroke="#fff" strokeWidth="3" />
+                        <path d="M12 7 v5 l3.5 2" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
+                      </svg>
+                    )}
+                    {status?.status === 'done' && (
+                      <svg className="node-mark" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 13 l4.5 4.5 L19 7" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
                   <p className="quest-label">{quest.label}</p>
                   <button
                     className="icon-btn speak-btn"
@@ -198,7 +174,7 @@ export function ChildHome({
       )}
 
       {celebration && !promotion && (
-        <Celebration data={celebration} onDone={() => setCelebration(null)} />
+        <Celebration childId={childId} data={celebration} onDone={() => setCelebration(null)} />
       )}
     </div>
   )

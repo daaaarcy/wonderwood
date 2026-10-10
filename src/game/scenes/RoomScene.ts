@@ -19,6 +19,8 @@ const TRACK = { cx: 620, cy: 596, rx: 250, ry: 62 }
 export class RoomScene extends Phaser.Scene {
   private charGroup!: Phaser.GameObjects.Container
   private bobber!: Phaser.GameObjects.Container
+  private bodyImage: Phaser.GameObjects.Image | null = null
+  private bodyChildId: string | null = null
   private train: Phaser.GameObjects.Image | null = null
   private trainT = 0.75
   private trainRunning = false
@@ -31,7 +33,9 @@ export class RoomScene extends Phaser.Scene {
   preload() {
     this.load.svg('room-bg', 'assets/room-bg.svg', { width: 1000, height: 700 })
     this.load.svg('explorer-theodore', 'assets/explorer-theodore.svg', { width: 400, height: 480 })
+    this.load.svg('explorer-theodore-blink', 'assets/explorer-theodore-blink.svg', { width: 400, height: 480 })
     this.load.svg('explorer-leonard', 'assets/explorer-leonard.svg', { width: 400, height: 480 })
+    this.load.svg('explorer-leonard-blink', 'assets/explorer-leonard-blink.svg', { width: 400, height: 480 })
     this.load.svg('hat-leaf', 'assets/hat-leaf.svg', { width: 240, height: 180 })
     this.load.svg('toy-train', 'assets/toy-train.svg', { width: 320, height: 220 })
   }
@@ -54,13 +58,28 @@ export class RoomScene extends Phaser.Scene {
 
     EventBus.emit('scene-ready', 'RoomScene')
     this.emitTrainState()
+
+    // idle blinking
+    this.time.addEvent({
+      delay: 3400,
+      loop: true,
+      callback: () => {
+        const body = this.bodyImage
+        const id = this.bodyChildId
+        if (!body || !id) return
+        body.setTexture(`explorer-${id}-blink`)
+        this.time.delayedCall(140, () => {
+          if (body.scene) body.setTexture(`explorer-${id}`)
+        })
+      },
+    })
   }
 
   private buildTrack() {
     const g = this.add.graphics()
     const { cx, cy, rx, ry } = TRACK
     // sleepers
-    g.lineStyle(5, 0x8a5a3b, 0.9)
+    g.lineStyle(6, 0xa06a42, 1)
     for (let i = 0; i < 28; i += 1) {
       const t = (i / 28) * Math.PI * 2
       const x1 = cx + (rx - 9) * Math.cos(t)
@@ -70,7 +89,7 @@ export class RoomScene extends Phaser.Scene {
       g.lineBetween(x1, y1, x2, y2)
     }
     // rails
-    g.lineStyle(4, 0x6b4226, 1)
+    g.lineStyle(5, 0x8a5a3b, 1)
     g.strokeEllipse(cx, cy, rx * 2 - 22, ry * 2 - 22)
     g.strokeEllipse(cx, cy, rx * 2 + 22, ry * 2 + 22)
   }
@@ -117,6 +136,8 @@ export class RoomScene extends Phaser.Scene {
       .setOrigin(0.5, 1)
       .setDisplaySize((EXPLORER_HEIGHT * 200) / 240, EXPLORER_HEIGHT)
     this.bobber.add(body)
+    this.bodyImage = body
+    this.bodyChildId = payload.childId
 
     if (payload.hat) {
       const item = itemById(payload.hat)

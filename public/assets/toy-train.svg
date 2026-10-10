@@ -1,40 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 110">
-  <defs>
-    <linearGradient id="trainBody" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f6886b"/>
-      <stop offset="1" stop-color="#e76f51"/>
-    </linearGradient>
-    <linearGradient id="trainCab" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#3bb3a2"/>
-      <stop offset="1" stop-color="#2e9e8f"/>
-    </linearGradient>
-  </defs>
-  <ellipse cx="80" cy="103" rx="66" ry="5" fill="#4a3226" opacity="0.12"/>
+  <ellipse cx="80" cy="105" rx="66" ry="5" fill="#3c3c3c" opacity="0.08"/>
   <!-- chimney -->
-  <rect x="118" y="18" width="14" height="26" rx="4" fill="#8a5a3b" stroke="#4a3226" stroke-width="3.5"/>
-  <rect x="113" y="12" width="24" height="10" rx="5" fill="#b07a4f" stroke="#4a3226" stroke-width="3.5"/>
+  <rect x="118" y="18" width="14" height="26" rx="5" fill="#777777"/>
+  <rect x="112" y="12" width="26" height="10" rx="5" fill="#afafaf"/>
   <!-- boiler -->
-  <rect x="76" y="40" width="70" height="36" rx="16" fill="url(#trainBody)" stroke="#4a3226" stroke-width="3.5"/>
+  <rect x="74" y="40" width="72" height="36" rx="18" fill="#ff9600"/>
+  <rect x="74" y="62" width="72" height="14" rx="7" fill="#e08600"/>
   <!-- front face -->
-  <circle cx="140" cy="58" r="12" fill="#f9b45c" stroke="#4a3226" stroke-width="3.5"/>
-  <circle cx="137" cy="56" r="2.4" fill="#4a3226"/>
-  <circle cx="145" cy="56" r="2.4" fill="#4a3226"/>
-  <path d="M137 62 q4 4 8 0" fill="none" stroke="#4a3226" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="140" cy="56" r="11" fill="#ffc800"/>
+  <circle cx="137" cy="54" r="2.4" fill="#3c3c3c"/>
+  <circle cx="145" cy="54" r="2.4" fill="#3c3c3c"/>
+  <path d="M137 60 q4 4 8 0" fill="none" stroke="#3c3c3c" stroke-width="2.5" stroke-linecap="round"/>
   <!-- dome -->
-  <path d="M92 40 q4 -14 14 -14 q10 0 14 14 z" fill="#f7c948" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M90 40 q4 -15 16 -15 q12 0 16 15 z" fill="#ffc800"/>
   <!-- cabin -->
-  <rect x="20" y="22" width="56" height="54" rx="8" fill="url(#trainCab)" stroke="#4a3226" stroke-width="3.5"/>
-  <rect x="30" y="32" width="22" height="20" rx="6" fill="#eafbff" stroke="#4a3226" stroke-width="3"/>
-  <rect x="14" y="14" width="68" height="14" rx="7" fill="#f7c948" stroke="#4a3226" stroke-width="3.5"/>
+  <rect x="20" y="24" width="54" height="52" rx="10" fill="#1cb0f6"/>
+  <rect x="20" y="62" width="54" height="14" rx="7" fill="#1899d6"/>
+  <rect x="30" y="34" width="24" height="22" rx="7" fill="#eafbff"/>
+  <rect x="13" y="15" width="68" height="14" rx="7" fill="#ffc800"/>
   <!-- base -->
-  <rect x="12" y="74" width="136" height="12" rx="6" fill="#8a5a3b" stroke="#4a3226" stroke-width="3.5"/>
+  <rect x="12" y="76" width="136" height="10" rx="5" fill="#4a4a4a"/>
   <!-- cowcatcher -->
-  <path d="M148 76 l14 10 h-14 z" fill="#f7c948" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M146 78 l16 10 h-16 z" fill="#ffc800"/>
   <!-- wheels -->
-  <circle cx="40" cy="90" r="13" fill="#4a3226"/>
-  <circle cx="40" cy="90" r="6" fill="#b07a4f"/>
-  <circle cx="80" cy="90" r="13" fill="#4a3226"/>
-  <circle cx="80" cy="90" r="6" fill="#b07a4f"/>
-  <circle cx="120" cy="90" r="13" fill="#4a3226"/>
-  <circle cx="120" cy="90" r="6" fill="#b07a4f"/>
+  <circle cx="40" cy="92" r="13" fill="#3c3c3c"/>
+  <circle cx="40" cy="92" r="6" fill="#afafaf"/>
+  <circle cx="80" cy="92" r="13" fill="#3c3c3c"/>
+  <circle cx="80" cy="92" r="6" fill="#afafaf"/>
+  <circle cx="120" cy="92" r="13" fill="#3c3c3c"/>
+  <circle cx="120" cy="92" r="6" fill="#afafaf"/>
 </svg>
