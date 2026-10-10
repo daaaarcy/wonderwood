@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 220">
+  <defs>
+    <linearGradient id="leCanopy" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a5e08e"/>
+      <stop offset="1" stop-color="#5bb85c"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="90" cy="212" rx="60" ry="6" fill="#4a3226" opacity="0.12"/>
+  <!-- trunk -->
+  <path d="M82 210 q-4 -50 2 -84 l14 0 q6 34 2 84 z" fill="#8a5a3b" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M94 176 q10 -8 14 -20" fill="none" stroke="#4a3226" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- rope ladder -->
+  <g stroke="#8a5a3b" stroke-width="3" stroke-linecap="round">
+    <line x1="122" y1="140" x2="126" y2="196"/>
+    <line x1="140" y1="140" x2="144" y2="196"/>
+    <line x1="123" y1="152" x2="142" y2="152"/>
+    <line x1="124" y1="166" x2="143" y2="166"/>
+    <line x1="125" y1="180" x2="144" y2="180"/>
+  </g>
+  <!-- platform -->
+  <rect x="28" y="124" width="124" height="14" rx="7" fill="#b07a4f" stroke="#4a3226" stroke-width="3.5"/>
+  <g stroke="#4a3226" stroke-width="3" stroke-linecap="round">
+    <line x1="36" y1="108" x2="36" y2="124"/><line x1="58" y1="106" x2="58" y2="124"/>
+    <line x1="122" y1="106" x2="122" y2="124"/><line x1="144" y1="108" x2="144" y2="124"/>
+    <line x1="30" y1="110" x2="150" y2="110"/>
+  </g>
+  <!-- house: rounder, orange door -->
+  <rect x="58" y="72" width="68" height="54" rx="16" fill="#f6e3ac" stroke="#4a3226" stroke-width="3.5"/>
+  <path d="M52 80 q40 -36 76 0 z" fill="#c9761a" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <circle cx="92" cy="106" r="14" fill="#8a5a3b" stroke="#4a3226" stroke-width="3"/>
+  <circle cx="97" cy="106" r="2.5" fill="#f7c948"/>
+  <circle cx="116" cy="88" r="6" fill="#eafbff" stroke="#4a3226" stroke-width="3"/>
+  <!-- canopy -->
+  <g fill="url(#leCanopy)" stroke="#4a3226" stroke-width="3.5">
+    <circle cx="50" cy="56" r="28"/>
+    <circle cx="92" cy="36" r="40"/>
+    <circle cx="132" cy="56" r="28"/>
+    <circle cx="66" cy="32" r="22"/>
+    <circle cx="118" cy="30" r="22"/>
+  </g>
+  <g fill="#3f9142" opacity="0.5">
+    <circle cx="44" cy="50" r="7"/><circle cx="140" cy="50" r="8"/><circle cx="98" cy="16" r="6"/>
+  </g>
+  <!-- flag: orange for Leonard -->
+  <line x1="92" y1="34" x2="92" y2="2" stroke="#4a3226" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M92 4 l30 8 -30 8 z" fill="#f2a03d" stroke="#4a3226" stroke-width="3" stroke-linejoin="round"/>
+</svg>

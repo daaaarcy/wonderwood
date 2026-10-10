@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 110">
+  <defs>
+    <linearGradient id="trainBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6886b"/>
+      <stop offset="1" stop-color="#e76f51"/>
+    </linearGradient>
+    <linearGradient id="trainCab" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3bb3a2"/>
+      <stop offset="1" stop-color="#2e9e8f"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="80" cy="103" rx="66" ry="5" fill="#4a3226" opacity="0.12"/>
+  <!-- chimney -->
+  <rect x="118" y="18" width="14" height="26" rx="4" fill="#8a5a3b" stroke="#4a3226" stroke-width="3.5"/>
+  <rect x="113" y="12" width="24" height="10" rx="5" fill="#b07a4f" stroke="#4a3226" stroke-width="3.5"/>
+  <!-- boiler -->
+  <rect x="76" y="40" width="70" height="36" rx="16" fill="url(#trainBody)" stroke="#4a3226" stroke-width="3.5"/>
+  <!-- front face -->
+  <circle cx="140" cy="58" r="12" fill="#f9b45c" stroke="#4a3226" stroke-width="3.5"/>
+  <circle cx="137" cy="56" r="2.4" fill="#4a3226"/>
+  <circle cx="145" cy="56" r="2.4" fill="#4a3226"/>
+  <path d="M137 62 q4 4 8 0" fill="none" stroke="#4a3226" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- dome -->
+  <path d="M92 40 q4 -14 14 -14 q10 0 14 14 z" fill="#f7c948" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <!-- cabin -->
+  <rect x="20" y="22" width="56" height="54" rx="8" fill="url(#trainCab)" stroke="#4a3226" stroke-width="3.5"/>
+  <rect x="30" y="32" width="22" height="20" rx="6" fill="#eafbff" stroke="#4a3226" stroke-width="3"/>
+  <rect x="14" y="14" width="68" height="14" rx="7" fill="#f7c948" stroke="#4a3226" stroke-width="3.5"/>
+  <!-- base -->
+  <rect x="12" y="74" width="136" height="12" rx="6" fill="#8a5a3b" stroke="#4a3226" stroke-width="3.5"/>
+  <!-- cowcatcher -->
+  <path d="M148 76 l14 10 h-14 z" fill="#f7c948" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <!-- wheels -->
+  <circle cx="40" cy="90" r="13" fill="#4a3226"/>
+  <circle cx="40" cy="90" r="6" fill="#b07a4f"/>
+  <circle cx="80" cy="90" r="13" fill="#4a3226"/>
+  <circle cx="80" cy="90" r="6" fill="#b07a4f"/>
+  <circle cx="120" cy="90" r="13" fill="#4a3226"/>
+  <circle cx="120" cy="90" r="6" fill="#b07a4f"/>
+</svg>

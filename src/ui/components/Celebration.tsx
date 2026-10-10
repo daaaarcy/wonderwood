@@ -1,0 +1,36 @@
+import { useEffect } from 'react'
+import { assetUrl } from '../../game/assets'
+
+export interface CelebrationData {
+  coins: number
+  stars: number
+}
+
+/**
+ * Approval celebration: coins fly toward the purse plus a star.
+ * With prefers-reduced-motion the CSS swaps the animation for a
+ * static highlight — this component always renders the same markup.
+ */
+export function Celebration({ data, onDone }: { data: CelebrationData; onDone: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 3200)
+    return () => clearTimeout(t)
+  }, [onDone])
+
+  return (
+    <div className="celebration" role="status" onClick={onDone}>
+      <div className="celebration-card">
+        <div className="celebration-burst" aria-hidden="true">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <img key={i} className={`fly-coin fly-coin-${i}`} src={assetUrl('coin')} alt="" />
+          ))}
+          <img className="fly-star" src={assetUrl('star')} alt="" />
+        </div>
+        <p className="celebration-text">
+          +{data.coins} coins{data.stars > 0 ? `, +${data.stars} star` : ''}!
+        </p>
+        <p className="celebration-sub">Great job, explorer!</p>
+      </div>
+    </div>
+  )
+}

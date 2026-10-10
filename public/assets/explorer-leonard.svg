@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240">
+  <defs>
+    <linearGradient id="lShirt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f9b45c"/>
+      <stop offset="1" stop-color="#f2a03d"/>
+    </linearGradient>
+    <radialGradient id="lSkin" cx="0.5" cy="0.4" r="0.7">
+      <stop offset="0" stop-color="#ffd9b0"/>
+      <stop offset="1" stop-color="#f6c89f"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="100" cy="231" rx="46" ry="7" fill="#4a3226" opacity="0.12"/>
+  <!-- legs -->
+  <rect x="78" y="186" width="16" height="30" rx="8" fill="#f6c89f" stroke="#4a3226" stroke-width="3.5"/>
+  <rect x="106" y="186" width="16" height="30" rx="8" fill="#f6c89f" stroke="#4a3226" stroke-width="3.5"/>
+  <!-- boots -->
+  <path d="M72 206 h26 v14 q0 8 -8 8 h-18 q-6 0 -6 -6 z" fill="#8a5a3b" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M102 206 h26 v14 q0 8 -8 8 h-18 q-6 0 -6 -6 z" fill="#8a5a3b" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <!-- shorts -->
+  <path d="M70 168 h60 v18 q0 8 -8 8 h-16 l-6 -12 -6 12 h-16 q-8 0 -8 -8 z" fill="#5c6e4e" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <!-- arms -->
+  <path d="M66 128 q-16 10 -14 34 q1 10 10 9 q7 -1 8 -10 l2 -22 z" fill="url(#lShirt)" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M134 128 q16 10 14 34 q-1 10 -10 9 q-7 -1 -8 -10 l-2 -22 z" fill="url(#lShirt)" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <circle cx="60" cy="168" r="8" fill="#f6c89f" stroke="#4a3226" stroke-width="3.5"/>
+  <circle cx="140" cy="168" r="8" fill="#f6c89f" stroke="#4a3226" stroke-width="3.5"/>
+  <!-- body / tunic -->
+  <path d="M68 118 q-4 30 2 54 q2 8 12 8 h36 q10 0 12 -8 q6 -24 2 -54 q-2 -10 -14 -10 h-36 q-12 0 -14 10 z" fill="url(#lShirt)" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <!-- neckerchief -->
+  <path d="M82 112 h36 l-18 22 z" fill="#2e9e8f" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <circle cx="100" cy="113" r="5" fill="#1f7a6e" stroke="#4a3226" stroke-width="3"/>
+  <!-- ears -->
+  <circle cx="63" cy="64" r="7" fill="#f6c89f" stroke="#4a3226" stroke-width="3"/>
+  <circle cx="137" cy="64" r="7" fill="#f6c89f" stroke="#4a3226" stroke-width="3"/>
+  <!-- head -->
+  <circle cx="100" cy="62" r="38" fill="url(#lSkin)" stroke="#4a3226" stroke-width="3.5"/>
+  <!-- hair: dark curly puffs -->
+  <g fill="#3f2a1c" stroke="#4a3226" stroke-width="3.5">
+    <circle cx="72" cy="42" r="15"/>
+    <circle cx="90" cy="30" r="16"/>
+    <circle cx="110" cy="30" r="16"/>
+    <circle cx="128" cy="42" r="15"/>
+    <circle cx="100" cy="26" r="14"/>
+  </g>
+  <path d="M64 52 q36 -22 72 0 l0 -6 q-36 -26 -72 0 z" fill="#3f2a1c"/>
+  <!-- face -->
+  <circle cx="86" cy="62" r="4.5" fill="#4a3226"/>
+  <circle cx="114" cy="62" r="4.5" fill="#4a3226"/>
+  <circle cx="87.5" cy="60.5" r="1.4" fill="#fffdf6"/>
+  <circle cx="115.5" cy="60.5" r="1.4" fill="#fffdf6"/>
+  <ellipse cx="76" cy="74" rx="7" ry="4.5" fill="#e76f51" opacity="0.4"/>
+  <ellipse cx="124" cy="74" rx="7" ry="4.5" fill="#e76f51" opacity="0.4"/>
+  <path d="M88 77 q12 11 24 0" fill="none" stroke="#4a3226" stroke-width="3.5" stroke-linecap="round"/>
+</svg>

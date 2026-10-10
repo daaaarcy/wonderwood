@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8c391"/>
+      <stop offset="1" stop-color="#d9ad74"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b07a4f"/>
+      <stop offset="1" stop-color="#8a5a3b"/>
+    </linearGradient>
+    <linearGradient id="winSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7ed6f2"/>
+      <stop offset="1" stop-color="#eafbff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- wall -->
+  <rect width="1000" height="520" fill="url(#wall)"/>
+  <g stroke="#c79a63" stroke-width="4">
+    <line x1="0" y1="90" x2="1000" y2="90"/>
+    <line x1="0" y1="180" x2="1000" y2="180"/>
+    <line x1="0" y1="270" x2="1000" y2="270"/>
+    <line x1="0" y1="360" x2="1000" y2="360"/>
+    <line x1="0" y1="450" x2="1000" y2="450"/>
+  </g>
+
+  <!-- floor -->
+  <rect y="520" width="1000" height="180" fill="url(#floor)"/>
+  <g stroke="#6b4226" stroke-width="3" opacity="0.5">
+    <line x1="0" y1="565" x2="1000" y2="565"/>
+    <line x1="0" y1="615" x2="1000" y2="615"/>
+    <line x1="0" y1="662" x2="1000" y2="662"/>
+  </g>
+  <rect y="512" width="1000" height="16" fill="#8a5a3b"/>
+
+  <!-- round window -->
+  <circle cx="770" cy="190" r="105" fill="#8a5a3b" stroke="#4a3226" stroke-width="5"/>
+  <circle cx="770" cy="190" r="88" fill="url(#winSky)"/>
+  <g clip-path="none">
+    <circle cx="730" cy="160" r="26" fill="#5bb85c"/>
+    <circle cx="760" cy="142" r="32" fill="#7fcb6e"/>
+    <circle cx="812" cy="230" r="30" fill="#5bb85c"/>
+    <ellipse cx="752" cy="248" rx="46" ry="16" fill="#f6e3ac"/>
+    <circle cx="742" cy="168" r="9" fill="#ffd93d"/>
+  </g>
+  <line x1="770" y1="102" x2="770" y2="278" stroke="#8a5a3b" stroke-width="8"/>
+  <line x1="682" y1="190" x2="858" y2="190" stroke="#8a5a3b" stroke-width="8"/>
+
+  <!-- leaf bunting -->
+  <g>
+    <path d="M60 60 q200 70 420 30 q180 -30 300 10" fill="none" stroke="#4a3226" stroke-width="3.5"/>
+    <g stroke="#4a3226" stroke-width="2.5">
+      <path d="M140 82 l14 22 l14 -18 z" fill="#7fcb6e"/>
+      <path d="M230 100 l14 22 l14 -18 z" fill="#f9dc5c"/>
+      <path d="M320 106 l14 22 l14 -18 z" fill="#f66d6d"/>
+      <path d="M410 104 l14 22 l14 -18 z" fill="#5ba8e0"/>
+      <path d="M560 86 l14 22 l14 -18 z" fill="#9b7ede"/>
+      <path d="M650 82 l14 22 l14 -18 z" fill="#f2a03d"/>
+    </g>
+  </g>
+
+  <!-- bookshelf -->
+  <g>
+    <rect x="80" y="250" width="180" height="18" rx="6" fill="#8a5a3b" stroke="#4a3226" stroke-width="3.5"/>
+    <rect x="96" y="196" width="20" height="54" rx="4" fill="#e76f51" stroke="#4a3226" stroke-width="3"/>
+    <rect x="120" y="204" width="18" height="46" rx="4" fill="#2e9e8f" stroke="#4a3226" stroke-width="3"/>
+    <rect x="142" y="190" width="22" height="60" rx="4" fill="#f7c948" stroke="#4a3226" stroke-width="3"/>
+    <rect x="168" y="208" width="18" height="42" rx="4" fill="#9b7ede" stroke="#4a3226" stroke-width="3"/>
+    <circle cx="222" cy="228" r="18" fill="#7fcb6e" stroke="#4a3226" stroke-width="3"/>
+  </g>
+
+  <!-- toy chest -->
+  <g>
+    <rect x="96" y="560" width="150" height="86" rx="14" fill="#c9761a" stroke="#4a3226" stroke-width="4"/>
+    <rect x="88" y="544" width="166" height="34" rx="14" fill="#f2a03d" stroke="#4a3226" stroke-width="4"/>
+    <rect x="160" y="576" width="22" height="20" rx="5" fill="#f7c948" stroke="#4a3226" stroke-width="3"/>
+  </g>
+
+  <!-- rug: sits inside the train-track oval (track is drawn by Phaser above it) -->
+  <ellipse cx="620" cy="596" rx="160" ry="36" fill="#f6e3ac" stroke="#4a3226" stroke-width="4"/>
+  <ellipse cx="620" cy="596" rx="124" ry="26" fill="#fff7e8" stroke="#d9ad74" stroke-width="3"/>
+  <g fill="#7fcb6e">
+    <ellipse cx="560" cy="596" rx="11" ry="6"/><ellipse cx="620" cy="593" rx="11" ry="6"/>
+    <ellipse cx="680" cy="596" rx="11" ry="6"/>
+  </g>
+
+  <!-- framed picture -->
+  <rect x="330" y="150" width="90" height="70" rx="8" fill="#fffdf6" stroke="#8a5a3b" stroke-width="6"/>
+  <path d="M342 200 l20 -24 l14 14 l16 -20 l16 30 z" fill="#7fcb6e"/>
+  <circle cx="352" cy="168" r="7" fill="#ffd93d"/>
+</svg>

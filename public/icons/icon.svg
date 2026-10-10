@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="icSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7ed6f2"/>
+      <stop offset="1" stop-color="#eafbff"/>
+    </linearGradient>
+    <linearGradient id="icSea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4fb0d8"/>
+      <stop offset="1" stop-color="#2e86b8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#icSky)"/>
+  <path d="M0 320 q128 -26 256 0 q128 26 256 0 l0 192 l-512 0 z" fill="url(#icSea)"/>
+  <ellipse cx="256" cy="420" rx="200" ry="80" fill="#f6e3ac" stroke="#4a3226" stroke-width="10"/>
+  <ellipse cx="256" cy="400" rx="170" ry="62" fill="#7fcb6e" stroke="#4a3226" stroke-width="10"/>
+  <!-- treehouse tree -->
+  <rect x="238" y="270" width="36" height="120" rx="14" fill="#8a5a3b" stroke="#4a3226" stroke-width="8"/>
+  <g fill="#5bb85c" stroke="#4a3226" stroke-width="8">
+    <circle cx="200" cy="230" r="58"/>
+    <circle cx="256" cy="195" r="70"/>
+    <circle cx="316" cy="230" r="58"/>
+  </g>
+  <rect x="216" y="240" width="80" height="56" rx="12" fill="#f6e3ac" stroke="#4a3226" stroke-width="8"/>
+  <path d="M208 250 q48 -40 96 0 z" fill="#e76f51" stroke="#4a3226" stroke-width="8" stroke-linejoin="round"/>
+  <!-- star -->
+  <path d="M256 84 q6 0 9 10 l7 19 q2.5 6 8.5 6.5 l20 2 q11 1 6 10 l-15 15 q-4.5 4.5 -3.2 10.5 l4.5 20 q2.3 11 -8.7 7.3 l-18.4 -10.2 q-5.6 -3 -11.2 0 l-18.4 10.2 q-11 3.7 -8.7 -7.3 l4.5 -20 q1.3 -6 -3.2 -10.5 l-15 -15 q-5 -9 6 -10 l20 -2 q6 -0.5 8.5 -6.5 l7 -19 q3 -10 9 -10 z"
+        fill="#ffd93d" stroke="#e6a91c" stroke-width="8" stroke-linejoin="round"/>
+  <!-- rainbow arc -->
+  <path d="M120 400 q136 -90 272 0" fill="none" stroke="#f66d6d" stroke-width="12" stroke-linecap="round" opacity="0.9"/>
+  <path d="M132 400 q124 -74 248 0" fill="none" stroke="#f9dc5c" stroke-width="12" stroke-linecap="round" opacity="0.9"/>
+  <path d="M144 400 q112 -58 224 0" fill="none" stroke="#5ba8e0" stroke-width="12" stroke-linecap="round" opacity="0.9"/>
+</svg>

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 220">
+  <defs>
+    <linearGradient id="thCanopy" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8fd97d"/>
+      <stop offset="1" stop-color="#57a94c"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="90" cy="212" rx="60" ry="6" fill="#4a3226" opacity="0.12"/>
+  <!-- trunk -->
+  <path d="M82 210 q-4 -50 2 -84 l14 0 q6 34 2 84 z" fill="#8a5a3b" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M88 170 q-10 -8 -14 -20" fill="none" stroke="#4a3226" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- rope ladder -->
+  <g stroke="#8a5a3b" stroke-width="3" stroke-linecap="round">
+    <line x1="40" y1="140" x2="36" y2="196"/>
+    <line x1="58" y1="140" x2="54" y2="196"/>
+    <line x1="38" y1="152" x2="57" y2="152"/>
+    <line x1="37" y1="166" x2="56" y2="166"/>
+    <line x1="36" y1="180" x2="55" y2="180"/>
+  </g>
+  <!-- platform -->
+  <rect x="28" y="124" width="124" height="14" rx="7" fill="#b07a4f" stroke="#4a3226" stroke-width="3.5"/>
+  <g stroke="#4a3226" stroke-width="3" stroke-linecap="round">
+    <line x1="36" y1="108" x2="36" y2="124"/><line x1="58" y1="106" x2="58" y2="124"/>
+    <line x1="122" y1="106" x2="122" y2="124"/><line x1="144" y1="108" x2="144" y2="124"/>
+    <line x1="30" y1="110" x2="150" y2="110"/>
+  </g>
+  <!-- house -->
+  <rect x="62" y="70" width="64" height="56" rx="10" fill="#f6e3ac" stroke="#4a3226" stroke-width="3.5"/>
+  <path d="M56 76 q34 -34 68 0 z" fill="#e76f51" stroke="#4a3226" stroke-width="3.5" stroke-linejoin="round"/>
+  <rect x="84" y="92" width="20" height="34" rx="9" fill="#8a5a3b" stroke="#4a3226" stroke-width="3"/>
+  <circle cx="99" cy="110" r="2.5" fill="#f7c948"/>
+  <circle cx="72" cy="88" r="7" fill="#eafbff" stroke="#4a3226" stroke-width="3"/>
+  <!-- canopy -->
+  <g fill="url(#thCanopy)" stroke="#4a3226" stroke-width="3.5">
+    <circle cx="52" cy="52" r="30"/>
+    <circle cx="90" cy="34" r="38"/>
+    <circle cx="130" cy="52" r="30"/>
+    <circle cx="70" cy="30" r="24"/>
+    <circle cx="112" cy="28" r="24"/>
+  </g>
+  <g fill="#3f9142" opacity="0.55">
+    <circle cx="46" cy="44" r="8"/><circle cx="134" cy="46" r="9"/><circle cx="92" cy="18" r="7"/>
+  </g>
+  <!-- flag: teal for Theodore -->
+  <line x1="90" y1="34" x2="90" y2="2" stroke="#4a3226" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M90 4 l30 8 -30 8 z" fill="#2e9e8f" stroke="#4a3226" stroke-width="3" stroke-linejoin="round"/>
+</svg>

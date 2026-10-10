@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- dotted traced letter B -->
+  <text x="16" y="46" font-family="Verdana, sans-serif" font-size="38" font-weight="bold"
+        fill="none" stroke="#4a3226" stroke-width="2" stroke-dasharray="4 3">B</text>
+  <!-- tracing line -->
+  <path d="M12 52 q14 6 30 0" fill="none" stroke="#2e9e8f" stroke-width="4" stroke-linecap="round"/>
+  <!-- pencil -->
+  <g transform="rotate(35 46 40)">
+    <rect x="42" y="12" width="9" height="30" rx="3" fill="#f7c948" stroke="#4a3226" stroke-width="3"/>
+    <path d="M42 42 l4.5 10 l4.5 -10 z" fill="#f6c89f" stroke="#4a3226" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M45 50 l1.5 4 l1.5 -4 z" fill="#4a3226"/>
+    <rect x="42" y="12" width="9" height="7" rx="3" fill="#e76f51" stroke="#4a3226" stroke-width="3"/>
+  </g>
+</svg>
