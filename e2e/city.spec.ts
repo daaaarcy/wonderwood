@@ -34,13 +34,13 @@ test('city loop: two claims → approvals → kits → road opens → library cu
   // Theodore + Leonard each claim a quest
   await pickExplorer(page, 'Theodore')
   await page
-    .locator('.quest-card', { hasText: 'Do your Duolingo lesson' })
+    .locator('.quest-card', { hasText: 'Spanish lesson' })
     .getByRole('button', { name: 'I did it!' })
     .click()
   await switchExplorer(page)
   await pickExplorer(page, 'Leonard')
   await page
-    .locator('.quest-card', { hasText: 'Play the word picture game' })
+    .locator('.quest-card', { hasText: 'Violin practice' })
     .getByRole('button', { name: 'I did it!' })
     .click()
 

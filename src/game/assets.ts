@@ -26,6 +26,12 @@ export const ASSET_FILES = {
   'icon-language': 'assets/icon-language.svg',
   'icon-letters': 'assets/icon-letters.svg',
   'icon-kindness': 'assets/icon-kindness.svg',
+  'icon-typing': 'assets/icon-typing.svg',
+  'icon-writing': 'assets/icon-writing.svg',
+  'icon-math': 'assets/icon-math.svg',
+  'icon-music-quest': 'assets/icon-music-quest.svg',
+  'icon-reading': 'assets/icon-reading.svg',
+  'icon-housework': 'assets/icon-housework.svg',
 } as const
 
 export type AssetKey = keyof typeof ASSET_FILES

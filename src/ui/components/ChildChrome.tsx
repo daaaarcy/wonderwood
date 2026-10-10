@@ -131,7 +131,7 @@ export function ChildChrome({ childId, tab, onTab, onSwitch, children }: Props) 
           </span>
           <span className="chip chip-star" aria-label={`${child.stars} stars`}>
             <img src={assetUrl('star')} alt="" />
-            <b>{child.stars}</b>
+            <b data-testid="star-count">{child.stars}</b>
           </span>
         </div>
       </header>

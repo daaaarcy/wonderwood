@@ -3,6 +3,7 @@
  * imports, so vitest can exercise it against an in-memory Store.
  */
 import { applyCommand, GROWN_UP_COMMANDS } from '../_shared/commands.ts'
+import { migrateState } from '../_shared/migrate.ts'
 import { initialState } from '../_shared/state.ts'
 import type { Command, GameState } from '../_shared/types.ts'
 import { commandDeps } from '../_shared/deps.ts'
@@ -53,19 +54,6 @@ const bad = (code: string, message: string, status = 403): Reply => ({
 const PIN_RE = /^\d{4}$/
 const CODE_RE = /^\d{6}$/
 
-/** is the state shape plausible? light structural check (full validation = domain) */
-function looksLikeState(v: unknown): v is GameState {
-  const s = v as GameState
-  return (
-    typeof s === 'object' &&
-    s !== null &&
-    (s.schemaVersion === 3 || s.schemaVersion === 4) &&
-    typeof s.children === 'object' &&
-    s.children !== null &&
-    typeof s.city === 'object' &&
-    s.city !== null
-  )
-}
 
 async function requireMembership(
   store: Store,
@@ -93,10 +81,11 @@ export async function handle(
         return bad('already-in-household', 'This account already has a household.')
       }
       let state: GameState
-      if (looksLikeState(body.initialState)) {
-        state = body.initialState as GameState
+      const tz = typeof body.timeZone === 'string' ? body.timeZone : 'UTC'
+      const imported = migrateState(body.initialState, { now, timeZone: tz })
+      if (body.initialState != null && imported) {
+        state = imported
       } else {
-        const tz = typeof body.timeZone === 'string' ? body.timeZone : 'UTC'
         state = initialState(now, tz)
       }
       const row = await store.createHouseholdRow(state)
@@ -137,7 +126,17 @@ export async function handle(
       const m = await requireMembership(store, auth, hid)
       if ('status' in m) return m
       if (m.role !== 'grown_up') return bad('grown-up-only', 'Only a grown-up can add devices.')
-      const code = String(Math.floor(100000 + Math.random() * 900000))
+      // uniform 6-digit code: rejection-sample digits so 0-9 are exactly even
+      const chars: string[] = []
+      while (chars.length < 6) {
+        const buf = new Uint32Array(8)
+        crypto.getRandomValues(buf)
+        for (const d of buf) {
+          if (chars.length >= 6) break
+          if (d < 4_000_000_000) chars.push(String(d % 10))
+        }
+      }
+      const code = chars.join('')
       const expiresAt = new Date(now.getTime() + 10 * 60_000).toISOString()
       await store.createPairingCodeRow(hid, code, expiresAt)
       return ok200({ code, expiresAt })
@@ -199,7 +198,10 @@ export async function handle(
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const row = await store.loadHousehold(hid)
         if (!row) return bad('not-found', 'Household not found.', 404)
-        const { state, result } = applyCommand(row.state, command, now, commandDeps)
+        const current =
+          migrateState(row.state, { now, timeZone: (row.state as { timeZone?: string }).timeZone ?? 'UTC' }) ??
+          row.state
+        const { state, result } = applyCommand(current, command, now, commandDeps)
         if (!result.ok) return ok200({ result, version: row.version, state: row.state })
         const wrote = await store.conditionalUpdate(hid, row.version, state)
         if (wrote) return ok200({ result, state, version: row.version + 1 })

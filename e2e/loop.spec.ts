@@ -44,14 +44,14 @@ test('full loop: claim → approve → buy → room → persistence', async ({ p
   await expect(page.getByTestId('coin-count')).toHaveText('20')
   await expect(page.getByTestId('project-road')).toHaveText('Road: 0 of 2 kits')
 
-  const langCard = page.locator('.quest-card', { hasText: 'Do your Duolingo lesson' })
+  const langCard = page.locator('.quest-card', { hasText: 'Spanish lesson' })
   await langCard.getByRole('button', { name: 'I did it!' }).click()
   await expect(langCard.getByText('Waiting for a grown-up')).toBeVisible()
 
   // --- grown-ups: set PIN + approve ---
   await switchExplorer(page)
   await enterGrownups(page)
-  const claimRow = page.locator('.pending-panel .claim-row', { hasText: 'Do your Duolingo lesson' })
+  const claimRow = page.locator('.pending-panel .claim-row', { hasText: 'Spanish lesson' })
   await expect(claimRow).toBeVisible()
   await claimRow.getByRole('button', { name: 'Approve' }).click()
   await expect(claimRow).toBeHidden()
@@ -63,7 +63,7 @@ test('full loop: claim → approve → buy → room → persistence', async ({ p
   await expect(page.getByTestId('coin-count')).toHaveText('30')
   await expect(page.getByTestId('project-road')).toHaveText('Road: 0 of 2 kits')
   await expect(
-    page.locator('.quest-card', { hasText: 'Do your Duolingo lesson' }).getByText('Done!'),
+    page.locator('.quest-card', { hasText: 'Spanish lesson' }).getByText('Done!'),
   ).toBeVisible()
 
   // --- shop: preview + buy the Leaf hat ---
@@ -113,9 +113,7 @@ test('double-clicking Approve awards the quest only once', async ({ page }) => {
 test('claim → reject → re-claim → approve awards +10 once', async ({ page }) => {
   await page.goto('/')
   await pickExplorer(page, 'Theodore')
-  const card = page.locator('.quest-card', { hasText: 'Help' }).or(
-    page.locator('.quest-card', { hasText: 'kind or helpful' }),
-  )
+  const card = page.locator('.quest-card', { hasText: 'Zoo Nightkeeper' })
   await card.getByRole('button', { name: 'I did it!' }).click()
   await expect(card.getByText('Waiting for a grown-up')).toBeVisible()
 
@@ -150,8 +148,8 @@ test('claim → reject → re-claim → approve awards +10 once', async ({ page 
 test("Leonard's quests differ from Theodore's", async ({ page }) => {
   await page.goto('/')
   await pickExplorer(page, 'Leonard')
-  await expect(page.getByText('Play the word picture game')).toBeVisible()
-  await expect(page.getByText('Trace three letters')).toBeVisible()
-  await expect(page.getByText('Help tidy up')).toBeVisible()
-  await expect(page.getByText('Do your Duolingo lesson')).toBeHidden()
+  await expect(page.getByText('Violin practice')).toBeVisible()
+  await expect(page.getByText('Counting for builders')).toBeVisible()
+  await expect(page.locator('.quest-label', { hasText: 'Reading' })).toBeVisible()
+  await expect(page.getByText('Spanish lesson')).toBeHidden()
 })

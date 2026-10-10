@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- math blocks, white glyph -->
+  <rect x="10" y="10" width="20" height="20" rx="5" fill="#ffffff"/>
+  <text x="20" y="25" font-family="Verdana, sans-serif" font-size="12" font-weight="bold" fill="#58cc02" text-anchor="middle">1</text>
+  <rect x="34" y="10" width="20" height="20" rx="5" fill="#ffffff" opacity="0.9"/>
+  <text x="44" y="25" font-family="Verdana, sans-serif" font-size="12" font-weight="bold" fill="#58cc02" text-anchor="middle">+</text>
+  <rect x="10" y="34" width="20" height="20" rx="5" fill="#ffffff" opacity="0.9"/>
+  <text x="20" y="49" font-family="Verdana, sans-serif" font-size="12" font-weight="bold" fill="#58cc02" text-anchor="middle">2</text>
+  <rect x="34" y="34" width="20" height="20" rx="5" fill="#ffffff"/>
+  <text x="44" y="49" font-family="Verdana, sans-serif" font-size="12" font-weight="bold" fill="#58cc02" text-anchor="middle">=</text>
+</svg>

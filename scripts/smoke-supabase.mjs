@@ -56,7 +56,7 @@ try {
   const hid = ch.data?.householdId
   created.households.push(hid)
   check('createHousehold', !!hid)
-  check('household state is v4 + tz', ch.data?.state?.schemaVersion === 4 && ch.data?.state?.timeZone === 'America/Los_Angeles')
+  check('household state is v5 + tz', ch.data?.state?.schemaVersion === 5 && ch.data?.state?.timeZone === 'America/Los_Angeles')
 
   // anonymous cannot createHousehold
   mark('stranger anon'); const { error: ae } = await stranger.auth.signInAnonymously()
@@ -85,7 +85,7 @@ try {
   mark('claim'); const claim = await fn(kid, {
     action: 'command',
     householdId: hid,
-    command: { type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: `smoke-${Date.now()}` },
+    command: { type: 'claimQuest', childId: 'theodore', questId: 'spanish', claimId: `smoke-${Date.now()}` },
   })
   check('device claimQuest ok', claim.data?.result?.ok === true)
   const claimId = Object.keys(claim.data.state.claims)[0]
@@ -131,7 +131,38 @@ try {
   )
 
   mark('await realtime'); const rt = await rtPromise
+  try { await kid.removeAllChannels() } catch {}
   check('realtime broadcast received by device', rt !== null && typeof rt.version === 'number')
+
+  // --- v5: grown-up schedule update needs PIN; reading rewards sequence ---
+  mark('updateSchedule PIN')
+  const sched = { 0: ['violin', 'reading'], 1: ['violin', 'reading'], 2: ['violin', 'reading'], 3: ['violin', 'reading'], 4: ['violin', 'reading'], 5: ['violin', 'reading'], 6: ['violin', 'reading'] }
+  const noPinSched = await fn(grown, { action: 'command', householdId: hid, command: { type: 'updateSchedule', childId: 'leonard', core: sched, bonus: ['housework'] } })
+  check('updateSchedule without PIN rejected', noPinSched.error !== null || noPinSched.data?.error != null)
+  const schedRes = await fn(grown, { action: 'command', householdId: hid, pin: '1234', command: { type: 'updateSchedule', childId: 'leonard', core: sched, bonus: ['housework'] } })
+  check('updateSchedule with PIN ok', schedRes.data?.result?.ok === true)
+
+  mark('reading units')
+  const read = (i, unit) =>
+    fn(kid, {
+      action: 'command', householdId: hid,
+      command: { type: 'claimQuest', childId: 'leonard', questId: 'reading', claimId: `read-${i}-${Date.now()}`, details: { kind: 'reading', unit, withGrownUp: false } },
+    })
+  const ids = []
+  for (const [i, unit] of [[0, 'book'], [1, 'chapter'], [2, 'chapter'], [3, 'book']]) {
+    const r = await read(i, unit)
+    ids.push(r.data?.result?.value?.id)
+  }
+  check('4 reading claims created', ids.every(Boolean))
+  let st = schedRes.data?.state
+  for (const id of ids) {
+    const a = await fn(grown, { action: 'command', householdId: hid, pin: '1234', command: { type: 'approveClaim', claimId: id } })
+    st = a.data?.state ?? st
+  }
+  const coins = st?.children?.leonard?.coins
+  const stars = st?.children?.leonard?.stars
+  const rew = ids.map((id) => st?.claims?.[id]?.reward?.coins)
+  check('reading rewards 10/5/5/0 + 1 star', JSON.stringify(rew) === '[10,5,5,0]' && stars === 1 && coins === 20 + 20, `coins=${coins} stars=${stars} rew=${JSON.stringify(rew)}`)
 
   // --- RLS: stranger cannot read the household; publishable cannot read secrets ---
   const { data: rls } = await stranger.from('households').select('id').eq('id', hid)
@@ -153,4 +184,11 @@ try {
       if (h) await admin.from('households').delete().eq('id', h)
     } catch {}
   }
+  for (const c of [grown, kid, stranger]) {
+    try { await c.removeAllChannels() } catch {}
+    try { await c.realtime.disconnect() } catch {}
+  }
+  const failed = results.filter((r) => r.startsWith('FAIL')).length
+  console.log(failed ? `\n${failed} FAIL` : '\nall pass')
+  process.exit(failed ? 1 : 0)
 }

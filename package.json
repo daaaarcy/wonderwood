@@ -15,7 +15,7 @@
     "icons": "node scripts/generate-icons.mjs",
     "sync:shared": "node scripts/sync-shared.mjs",
     "pretest": "node scripts/sync-shared.mjs",
-    "deploy:game": "node scripts/sync-shared.mjs && supabase functions deploy game --use-api",
+    "deploy:game": "node scripts/deploy-game.mjs",
     "smoke:supabase": "node scripts/sync-shared.mjs && node scripts/smoke-supabase.mjs"
   },
   "dependencies": {

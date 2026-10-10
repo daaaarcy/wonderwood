@@ -1,6 +1,8 @@
-import { addDaysKey, eligibleDays, localDateKey, mondayKeyOf } from './week.ts'
+import { addDaysKey, localDateKey, mondayKeyOf, weekdayOf } from './week.ts'
+import { scheduleForDate } from './migrate.ts'
 import { projectById } from '../data/city.ts'
-import type { ChildId, GameState, ProjectId } from './types.ts'
+import type { ChildId, Claim, GameState, ProjectId } from './types.ts'
+import { BONUS_SLOTS_PER_DAY } from './types.ts'
 
 export type QuestStatus = 'available' | 'pending' | 'done'
 
@@ -10,32 +12,66 @@ export interface TodayQuest {
   claimId: string | null
 }
 
+export type TodayView =
+  | { restDay: true }
+  | {
+      restDay: false
+      core: TodayQuest[]
+      bonus: TodayQuest[]
+      /** rewarded bonus activities still open today (pending+approved count down) */
+      bonusSlotsLeft: number
+      /** reading claims already logged today (journal or pending) */
+      readingClaims: TodayQuest[]
+    }
+
 /**
- * Status of each of a child's daily quests for the local day containing `now`.
- * `questIds` comes from src/data (the child's three quests for the day).
+ * Today's quests for a child from their schedule: core cards, bonus offers,
+ * remaining bonus-coin slots, and every reading claim already logged.
  */
-export function todayQuestsFor(
-  state: GameState,
-  childId: ChildId,
-  questIds: string[],
-  now: Date,
-): TodayQuest[] {
+export function todayQuestsFor(state: GameState, childId: ChildId, now: Date): TodayView {
   const day = localDateKey(now, state.timeZone)
-  return questIds.map((questId) => {
-    const claim = Object.values(state.claims).find(
+  if (state.pausedDates[childId].includes(day)) return { restDay: true }
+  const schedule = scheduleForDate(state, day)[childId]
+  const weekday = (weekdayOf(day) + 6) % 7
+  const coreIds = schedule.core[weekday] ?? []
+  const bonusIds = schedule.bonus
+
+  const todaysClaims = (questId?: string) =>
+    Object.values(state.claims).filter(
       (c) =>
         c.childId === childId &&
-        c.questId === questId &&
         c.activityDate === day &&
-        c.status !== 'rejected',
+        c.status !== 'rejected' &&
+        (questId === undefined || c.questId === questId),
     )
+
+  const statusOf = (questId: string): TodayQuest => {
+    const claim = todaysClaims(questId)[0]
     if (!claim) return { questId, status: 'available', claimId: null }
     return {
       questId,
       status: claim.status === 'approved' ? 'done' : 'pending',
       claimId: claim.id,
     }
-  })
+  }
+
+  const bonusUsed = todaysClaims().filter((c) => c.role === 'bonus').length
+  const coreDoneOrPending = todaysClaims()
+    .filter((c) => c.role === 'core')
+    .map((c) => c.questId)
+  // Reading is only offered again via the journal flow once its card is used —
+  // extra units are logged from the card itself.
+  return {
+    restDay: false,
+    core: coreIds.map((id) => statusOf(id)),
+    bonus: bonusIds.filter((id) => !coreDoneOrPending.includes(id)).map((id) => statusOf(id)),
+    bonusSlotsLeft: Math.max(0, BONUS_SLOTS_PER_DAY - bonusUsed),
+    readingClaims: todaysClaims('reading').map((c) => ({
+      questId: c.questId,
+      status: c.status === 'approved' ? ('done' as const) : ('pending' as const),
+      claimId: c.id,
+    })),
+  }
 }
 
 /* ---------------- Town projects ---------------- */
@@ -77,15 +113,58 @@ export function pendingClaims(state: GameState) {
     .sort((a, b) => a.claimedAt.localeCompare(b.claimedAt))
 }
 
+/* ---------------- Reading journal ---------------- */
+
+export interface ReadingEntry {
+  claimId: string
+  date: string
+  unit: 'book' | 'chapter'
+  title?: string
+  withGrownUp: boolean
+  status: 'pending' | 'approved'
+}
+
+export interface ReadingJournal {
+  entries: ReadingEntry[] // newest first
+  totals: { books: number; chapters: number } // approved only
+}
+
+/** A child's reading log — entries and separate book/chapter totals. */
+export function readingJournal(state: GameState, childId: ChildId): ReadingJournal {
+  const reading = Object.values(state.claims).filter(
+    (c: Claim) => c.childId === childId && c.questId === 'reading' && c.status !== 'rejected',
+  )
+  const entries = reading
+    .map((c) => ({
+      claimId: c.id,
+      date: c.activityDate,
+      unit: c.details?.kind === 'reading' ? c.details.unit : ('book' as const),
+      title: c.details?.kind === 'reading' ? c.details.title : undefined,
+      withGrownUp: c.details?.kind === 'reading' ? c.details.withGrownUp : false,
+      status: c.status as 'pending' | 'approved',
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date))
+  const approved = entries.filter((e) => e.status === 'approved')
+  return {
+    entries,
+    totals: {
+      books: approved.filter((e) => e.unit === 'book').length,
+      chapters: approved.filter((e) => e.unit === 'chapter').length,
+    },
+  }
+}
+
 /* ---------------- League selectors ---------------- */
 
 export interface LeagueWeekStatus {
-  /** approved claims by this child so far this week */
+  /** approved core claims by this child so far this week */
   count: number
-  /** distinct days with approved claims this week */
+  /** distinct days with approved core claims this week */
   activeDays: number
-  /** days of this week on/after createdAt and ≤ Sunday (as judged at week's end) */
+  /** non-paused days with a core schedule, ≥ createdAt, ≤ Sunday */
   eligibleDays: number
+  /** scheduled core quests on eligible days */
+  opportunities: number
   /** quests needed for promotion this week (null on a rest week) */
   target: number | null
   /** fewer than 3 eligible days → neutral rest week */
@@ -95,20 +174,32 @@ export interface LeagueWeekStatus {
 /** Live status for the in-progress week shown on the League screen. */
 export function leagueWeekStatus(state: GameState, childId: ChildId, now: Date): LeagueWeekStatus {
   const week = mondayKeyOf(localDateKey(now, state.timeZone))
-  const createdKey = localDateKey(new Date(state.createdAt), state.timeZone)
   const sunday = addDaysKey(week, 6)
-  // Eligibility as it will stand at week's end (days ≥ createdAt, ≤ Sunday).
-  const days = eligibleDays(week, createdKey, sunday)
+  const createdKey = localDateKey(new Date(state.createdAt), state.timeZone)
+  let days = 0
+  let opportunities = 0
+  for (let d = week; d <= sunday; d = addDaysKey(d, 1)) {
+    if (d < createdKey) continue
+    if (state.pausedDates[childId].includes(d)) continue
+    const weekday = (weekdayOf(d) + 6) % 7
+    const core = scheduleForDate(state, d)[childId].core[weekday] ?? []
+    if (core.length > 0) {
+      days += 1
+      opportunities += core.length
+    }
+  }
   const claims = Object.values(state.claims).filter(
     (c) =>
       c.childId === childId &&
       c.status === 'approved' &&
       c.activityDate >= week &&
-      c.activityDate <= sunday,
+      c.activityDate <= sunday &&
+      c.role === 'core' &&
+      (c.reward?.stars ?? 0) > 0,
   )
   const count = claims.length
   const activeDays = new Set(claims.map((c) => c.activityDate)).size
   const restWeek = days < 3
-  const target = restWeek ? null : Math.ceil(0.7 * 3 * days)
-  return { count, activeDays, eligibleDays: days, target, restWeek }
+  const target = restWeek ? null : Math.ceil(0.7 * opportunities)
+  return { count, activeDays, eligibleDays: days, opportunities, target, restWeek }
 }

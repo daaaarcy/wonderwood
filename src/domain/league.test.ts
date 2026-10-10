@@ -4,7 +4,7 @@ import { initialState } from './state.ts'
 import { leagueWeekStatus } from './selectors.ts'
 import type { CommandDeps, GameState } from './types.ts'
 import { commandDeps } from '../data/registry.ts'
-import { questsFor } from '../data/quests.ts'
+import { DEFAULT_SCHEDULE } from '../data/quests.ts'
 
 const deps: CommandDeps = commandDeps
 
@@ -15,7 +15,7 @@ const NOW_W2 = new Date('2026-09-21T10:00:00Z')
 
 function claimAndApprove(s: GameState, day: Date, n: number, questOffset = 0): GameState {
   let next = s
-  const quests = questsFor('theodore')
+  const quests = (DEFAULT_SCHEDULE.theodore.core[0] ?? []).map((id) => ({ id }))
   for (let i = 0; i < n; i += 1) {
     const quest = quests[(i + questOffset) % quests.length]
     const id = `${day.toISOString().slice(0, 10)}-${quest.id}-${questOffset}`
@@ -141,7 +141,7 @@ describe('league promotion rule', () => {
     // one more claim left PENDING in W0
     const pending = claimQuest(
       s,
-      { childId: 'theodore', questId: 'theodore-kindness', claimId: 'late-1' },
+      { childId: 'theodore', questId: 'zoo-nightkeeper', claimId: 'late-1' },
       new Date('2026-09-12T11:00:00Z'),
       deps,
     )
@@ -165,7 +165,7 @@ describe('league promotion rule', () => {
     let s = initialState(new Date('2026-09-01T08:00:00Z'))
     // 12 approved + 3 pending + 3 rejected in W0
     s = weekOfApprovals(s, MONDAY_W0, 4, 3)
-    const q = questsFor('theodore')
+    const q = (DEFAULT_SCHEDULE.theodore.core[0] ?? []).map((id) => ({ id }))
     for (let i = 0; i < 3; i += 1) {
       s = claimQuest(s, { childId: 'theodore', questId: q[i].id, claimId: `pend-${i}` }, new Date('2026-09-12T10:00:00Z'), deps).state
     }
@@ -182,10 +182,10 @@ describe('league promotion rule', () => {
 describe('parentCompleteAndApprove with an existing claim', () => {
   it('approves the child’s pending claim instead of erroring', () => {
     let s = initialState(new Date('2026-09-14T09:00:00Z'))
-    s = claimQuest(s, { childId: 'theodore', questId: 'theodore-language', claimId: 'kid-1' }, NOW_W1, deps).state
+    s = claimQuest(s, { childId: 'theodore', questId: 'spanish', claimId: 'kid-1' }, NOW_W1, deps).state
     const out = applyCommand(
       s,
-      { type: 'parentCompleteAndApprove', childId: 'theodore', questId: 'theodore-language', claimId: 'parent-1' },
+      { type: 'parentCompleteAndApprove', childId: 'theodore', questId: 'spanish', claimId: 'parent-1' },
       NOW_W1,
       deps,
     )
@@ -201,13 +201,13 @@ describe('parentCompleteAndApprove with an existing claim', () => {
     let s = initialState(new Date('2026-09-14T09:00:00Z'))
     s = applyCommand(
       s,
-      { type: 'parentCompleteAndApprove', childId: 'theodore', questId: 'theodore-language', claimId: 'parent-1' },
+      { type: 'parentCompleteAndApprove', childId: 'theodore', questId: 'spanish', claimId: 'parent-1' },
       NOW_W1,
       deps,
     ).state
     const again = applyCommand(
       s,
-      { type: 'parentCompleteAndApprove', childId: 'theodore', questId: 'theodore-language', claimId: 'parent-2' },
+      { type: 'parentCompleteAndApprove', childId: 'theodore', questId: 'spanish', claimId: 'parent-2' },
       NOW_W1,
       deps,
     )
@@ -239,5 +239,59 @@ describe('acknowledgePromotion + leagueWeekStatus', () => {
     // Saturday-created state → rest week
     const s2 = initialState(new Date('2026-09-19T08:00:00Z')) // Sat of W1
     expect(leagueWeekStatus(s2, 'theodore', new Date('2026-09-19T09:00:00Z')).restWeek).toBe(true)
+  })
+})
+
+describe('v5 schedule-aware leagues', () => {
+  it('paused days drop out of eligibility and opportunities', () => {
+    let s = initialState(new Date('2026-09-01T08:00:00Z'))
+    s = weekOfApprovals(s, MONDAY_W0, 5, 3) // 15 over 5 days
+    // pause Sat+Sun of W0 → still 5 eligible days, 15 opportunities → promote
+    s = applyCommand(
+      s,
+      { type: 'setPaused', childId: 'theodore', dates: ['2026-09-12', '2026-09-13'], paused: true },
+      NOW_W1,
+      deps,
+    ).state
+    s = eval_(s, NOW_W1)
+    expect(s.children.theodore.league.rank).toBe(2)
+  })
+
+  it('bonus claims never count toward promotion', () => {
+    let s = initialState(new Date('2026-09-01T08:00:00Z'))
+    s = weekOfApprovals(s, MONDAY_W0, 4, 3) // 12 core approvals
+    // 6 bonus claims approved the same week — must not help
+    for (let i = 0; i < 6; i += 1) {
+      const id = `bonus-${i}`
+      s = claimQuest(s, { childId: 'theodore', questId: 'math-mission', claimId: id },
+        new Date(`2026-09-${String(7 + (i % 7)).padStart(2, '0')}T11:00:00Z`), deps).state
+      // math-mission is bonus → one claim per quest per day blocked; use a second bonus quest
+      s = claimQuest(s, { childId: 'theodore', questId: i % 2 ? 'spanish-extra' : 'housework', claimId: `${id}-b` },
+        new Date(`2026-09-${String(7 + (i % 7)).padStart(2, '0')}T11:30:00Z`), deps).state
+      s = approveClaim(s, { claimId: id }, NOW_W1, deps).state
+      s = approveClaim(s, { claimId: `${id}-b` }, NOW_W1, deps).state
+    }
+    s = eval_(s, NOW_W1)
+    expect(s.children.theodore.league.rank).toBe(1) // 12 < 15 despite 12 extra bonus approvals
+  })
+
+  it('a mid-week schedule change applies per-day', () => {
+    let s = initialState(new Date('2026-09-01T08:00:00Z'))
+    // effectiveFrom Thursday → Mon-Wed have 3 core quests, Thu-Sun only 1
+    s = applyCommand(
+      s,
+      {
+        type: 'updateSchedule', childId: 'theodore',
+        core: Object.fromEntries(Array.from({ length: 7 }, (_, d) => [d, ['spanish']])),
+        bonus: ['math-mission'],
+        effectiveFrom: '2026-09-10', // Thursday of W0
+      },
+      NOW_W1,
+      deps,
+    ).state
+    // opportunities = 3×3 (Mon-Wed) + 1×4 (Thu-Sun) = 13 → target ceil(0.7×13)=10
+    s = weekOfApprovals(s, MONDAY_W0, 4, 3) // 12 approvals Mon–Thu
+    s = eval_(s, NOW_W1)
+    expect(s.children.theodore.league.rank).toBe(2) // 12 ≥ 10
   })
 })

@@ -4,6 +4,14 @@ export const CHILD_IDS: ChildId[] = ['theodore', 'leonard']
 
 export type EquipSlot = 'hat' | 'toy'
 export type ClaimStatus = 'pending' | 'approved' | 'rejected'
+export type ClaimRole = 'core' | 'bonus'
+export type DateKey = string // 'YYYY-MM-DD' in the family's time zone
+
+/** What the child actually did, for the grown-up's approval view + journal. */
+export type ClaimDetails =
+  | { kind: 'reading'; unit: 'book' | 'chapter'; title?: string; withGrownUp: boolean }
+  | { kind: 'challenge'; hintsUsed: number; correctFirstTry: number }
+  | { kind: 'housework'; job: string }
 export type LedgerReason = 'welcome' | 'quest' | 'purchase' | 'kit'
 
 export interface LedgerEntry {
@@ -22,9 +30,14 @@ export interface Claim {
   questId: string
   /** Local YYYY-MM-DD of the day the child tapped "I did it!" */
   activityDate: string
+  /** 'core' or 'bonus' — decided at claim time from that day's schedule. */
+  role: ClaimRole
   status: ClaimStatus
   claimedAt: string
   decidedAt?: string
+  details?: ClaimDetails
+  /** The reward actually given — stamped at approval. */
+  reward?: { coins: number; stars: number }
 }
 
 export interface Purchase {
@@ -79,8 +92,27 @@ export interface CityState {
   foundersBridgePlanks: number
 }
 
+export interface ChildConfig {
+  mathLevel: 1 | 2 | 3
+  violinGoal: string
+  typingUrl: string | null
+  houseworkJobs: string[]
+}
+
+/** Which quests are core (per weekday, 0=Mon..6=Sun) vs bonus for one child. */
+export interface DaySchedule {
+  core: Record<number, string[]>
+  bonus: string[]
+}
+
 export interface GameState {
-  schemaVersion: 4
+  schemaVersion: 5
+  /** Grown-up-editable per-child settings. */
+  config: Record<ChildId, ChildConfig>
+  /** Schedule history — a day uses the latest entry with effectiveFrom ≤ day. */
+  scheduleHistory: { effectiveFrom: DateKey; schedule: Record<ChildId, DaySchedule> }[]
+  /** Days with no quests ("Rest day"), per child. */
+  pausedDates: Record<ChildId, DateKey[]>
   /** ISO timestamp of when this save was first created. */
   createdAt: string
   /** IANA time zone the family lives in — all activity dates/weeks are local to it. */
@@ -103,10 +135,10 @@ export interface CatalogItem {
 }
 
 export type Command =
-  | { type: 'claimQuest'; childId: ChildId; questId: string; claimId: string }
+  | { type: 'claimQuest'; childId: ChildId; questId: string; claimId: string; details?: ClaimDetails }
   | { type: 'approveClaim'; claimId: string }
   | { type: 'rejectClaim'; claimId: string }
-  | { type: 'parentCompleteAndApprove'; childId: ChildId; questId: string; claimId: string }
+  | { type: 'parentCompleteAndApprove'; childId: ChildId; questId: string; claimId: string; details?: ClaimDetails }
   | { type: 'purchase'; childId: ChildId; itemId: string; purchaseId: string }
   | { type: 'equip'; childId: ChildId; slot: EquipSlot; itemId: string | null }
   | { type: 'setWish'; childId: ChildId; itemId: string | null }
@@ -116,6 +148,19 @@ export type Command =
   | { type: 'buyKit'; childId: ChildId; projectId: ProjectId; kitPurchaseId: string }
   | { type: 'suggestProject'; childId: ChildId; projectId: ProjectId }
   | { type: 'chooseNextProject'; projectId: ProjectId }
+  | {
+      type: 'updateSchedule'
+      childId: ChildId
+      core: Record<number, string[]>
+      bonus: string[]
+      effectiveFrom?: string
+    }
+  | { type: 'setPaused'; childId: ChildId; dates: string[]; paused: boolean }
+  | {
+      type: 'updateChildConfig'
+      childId: ChildId
+      patch: Partial<ChildConfig>
+    }
 
 export type DomainErrorCode =
   | 'already-claimed-today'
@@ -130,6 +175,10 @@ export type DomainErrorCode =
   | 'invalid-pin'
   | 'not-current-project'
   | 'project-complete'
+  | 'rest-day'
+  | 'not-scheduled'
+  | 'invalid-schedule'
+  | 'invalid-config'
 
 export interface DomainError {
   code: DomainErrorCode
@@ -144,14 +193,23 @@ export interface CommandOutcome<T> {
 }
 
 /** Data lookups the domain needs, injected so domain stays free of data imports. */
+/** The quest info commands need from the data layer. */
+export interface QuestInfo {
+  id: string
+  childIds: ChildId[]
+  retired?: boolean
+}
+
 export interface CommandDeps {
-  questExists: (questId: string) => boolean
+  getQuest: (questId: string) => QuestInfo | undefined
   getItem: (itemId: string) => CatalogItem | undefined
   /** Town project def (kits required); undefined for unknown ids. */
   getProject: (projectId: string) => { id: ProjectId; kits: number } | undefined
 }
 
-/** Quest reward — same for every quest in Stage 1. */
-export const QUEST_REWARD = { coins: 10, stars: 1 } as const
+export const CORE_REWARD = { coins: 10, stars: 1 } as const
+export const BONUS_REWARD = { coins: 5, stars: 0 } as const
+/** Rewarded bonus activities per child per day (shared across bonus types). */
+export const BONUS_SLOTS_PER_DAY = 2
 export const WELCOME_COINS = 20
 export const MAX_LEAGUE_RANK = 14

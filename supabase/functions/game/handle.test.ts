@@ -164,7 +164,7 @@ describe('game edge function', () => {
     const hid = await store.seed()
     const r = await call(store, { userId: 'stranger', isAnonymous: true }, 'command', {
       householdId: hid,
-      command: { type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'x' },
+      command: { type: 'claimQuest', childId: 'theodore', questId: 'spanish', claimId: 'x' },
     })
     expect(r.status).toBe(403)
     const lm = await call(store, { userId: 'stranger', isAnonymous: true }, 'listMembers', { householdId: hid })
@@ -195,7 +195,7 @@ describe('game edge function', () => {
     // paired device can run a normal command without a PIN
     const claim = await call(store, KID, 'command', {
       householdId: hid,
-      command: { type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'd1' },
+      command: { type: 'claimQuest', childId: 'theodore', questId: 'spanish', claimId: 'd1' },
     })
     expect((claim.json as { result: { ok: boolean } }).result.ok).toBe(true)
   })
@@ -206,7 +206,7 @@ describe('game edge function', () => {
     store.failNextUpdate = 1
     const r = await call(store, GROWN, 'command', {
       householdId: hid,
-      command: { type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'c-race' },
+      command: { type: 'claimQuest', childId: 'theodore', questId: 'spanish', claimId: 'c-race' },
     })
     expect((r.json as { version: number }).version).toBe(2)
     expect(Object.keys(store.households.get(hid)!.state.claims)).toEqual(['c-race'])
@@ -248,5 +248,50 @@ describe('game edge function', () => {
     expect(ok.status).toBe(200)
     const v = await call(store, KID, 'verifyPin', { householdId: hid, pin: '1234' })
     expect((v.json as { result: string }).result).toBe('ok')
+  })
+})
+
+describe('v5: grown-up commands + migration on load', () => {
+  it('updateSchedule/setPaused/updateChildConfig require the PIN', async () => {
+    const store = new FakeStore()
+    const hid = await store.seed()
+    await store.setPin(hid, '1234')
+    const sched = {
+      0: ['spanish'], 1: ['spanish'], 2: ['spanish'], 3: ['spanish'],
+      4: ['spanish'], 5: ['spanish'], 6: ['spanish'],
+    }
+    for (const command of [
+      { type: 'updateSchedule', childId: 'theodore', core: sched, bonus: [] },
+      { type: 'setPaused', childId: 'theodore', dates: ['2026-10-10'], paused: true },
+      { type: 'updateChildConfig', childId: 'leonard', patch: { mathLevel: 3 } },
+    ]) {
+      const noPin = await call(store, GROWN, 'command', { householdId: hid, command })
+      expect(noPin.status).toBe(403)
+      const withPin = await call(store, GROWN, 'command', { householdId: hid, pin: '1234', command })
+      expect(withPin.status).toBe(200)
+    }
+  })
+
+  it('migrates a v4 stored row before applying a command', async () => {
+    const store = new FakeStore()
+    const v4 = { ...initialState(NOW, 'UTC'), schemaVersion: 4 as const } as unknown as GameState
+    delete (v4 as unknown as Record<string, unknown>).config
+    delete (v4 as unknown as Record<string, unknown>).scheduleHistory
+    delete (v4 as unknown as Record<string, unknown>).pausedDates
+    const r = await store.createHouseholdRow(v4)
+    const hid = r.id
+    await store.addMember(hid, GROWN.userId, 'grown_up', 'grown-up')
+    // kid claim — 'spanish' is scheduled core in the migrated v5 schedule
+    await store.addMember(hid, KID.userId, 'device', 'tablet')
+    const claim = await call(store, KID, 'command', {
+      householdId: hid,
+      command: { type: 'claimQuest', childId: 'theodore', questId: 'spanish', claimId: 'mig-1' },
+    })
+    expect(claim.status).toBe(200)
+    expect((claim.json as { result: { ok: boolean } }).result.ok).toBe(true)
+    // the persisted doc is migrated v5
+    const stored = store.households.get(hid)!.state
+    expect(stored.schemaVersion).toBe(5)
+    expect(stored.scheduleHistory.length).toBeGreaterThan(0)
   })
 })

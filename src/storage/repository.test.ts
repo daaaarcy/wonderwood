@@ -32,7 +32,7 @@ describe('LocalStorageRepository', () => {
     const storage = new FakeStorage()
     const repo = new LocalStorageRepository(storage, commandDeps)
     const s = repo.load()
-    expect(s.schemaVersion).toBe(4)
+    expect(s.schemaVersion).toBe(5)
     expect(s.children.theodore.coins).toBe(20)
     expect(s.city.currentProjectId).toBe('road')
     expect(s.city.projects.road.status).toBe('building')
@@ -44,7 +44,7 @@ describe('LocalStorageRepository', () => {
   it('round-trips: load after save gives equal state', async () => {
     const storage = new FakeStorage()
     const repo1 = new LocalStorageRepository(storage, commandDeps)
-    await repo1.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'c1' })
+    await repo1.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'spanish', claimId: 'c1' })
     await repo1.dispatch({ type: 'approveClaim', claimId: 'c1' })
     await repo1.dispatch({ type: 'purchase', childId: 'theodore', itemId: 'hat-leaf', purchaseId: 'p1' })
     await repo1.dispatch({ type: 'buyKit', childId: 'theodore', projectId: 'road', kitPurchaseId: 'k1' })
@@ -66,7 +66,7 @@ describe('LocalStorageRepository', () => {
     const storage = new FakeStorage()
     storage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 99, children: {} }))
     const repo = new LocalStorageRepository(storage, commandDeps)
-    expect(repo.load().schemaVersion).toBe(4)
+    expect(repo.load().schemaVersion).toBe(5)
     expect(storage.dump().some((k) => k.includes('corrupt'))).toBe(true)
   })
 
@@ -76,7 +76,7 @@ describe('LocalStorageRepository', () => {
     const repoB = new LocalStorageRepository(storage, commandDeps) // never gets storage events
 
     // A approves a claim, then A buys the hat (coins 30 → 10)
-    await repoA.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'c1' })
+    await repoA.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'spanish', claimId: 'c1' })
     await repoA.dispatch({ type: 'approveClaim', claimId: 'c1' })
     await repoA.dispatch({ type: 'purchase', childId: 'theodore', itemId: 'hat-leaf', purchaseId: 'pA' })
     expect(repoA.load().children.theodore.coins).toBe(10)
@@ -104,7 +104,7 @@ describe('LocalStorageRepository', () => {
     const repoB = new LocalStorageRepository(storage, commandDeps)
 
     // Theodore gets 10 more coins, Leonard keeps his 20.
-    await repoA.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'c1' })
+    await repoA.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'spanish', claimId: 'c1' })
     await repoA.dispatch({ type: 'approveClaim', claimId: 'c1' })
     await repoA.dispatch({ type: 'buyKit', childId: 'theodore', projectId: 'road', kitPurchaseId: 'k1' })
     expect(repoA.load().city.projects.road.kits).toBe(1)
@@ -147,7 +147,7 @@ describe('LocalStorageRepository', () => {
     storage.setItem(STORAGE_KEY, JSON.stringify(v1))
     const repo = new LocalStorageRepository(storage, commandDeps)
     const s = repo.load()
-    expect(s.schemaVersion).toBe(4)
+    expect(s.schemaVersion).toBe(5)
     expect(s.createdAt).toBe('2026-09-01T08:00:00.000Z') // earliest ledger entry
     expect(s.children.theodore.coins).toBe(33)
     expect(s.children.theodore.inventory).toContain('hat-leaf')
@@ -186,7 +186,7 @@ describe('LocalStorageRepository', () => {
     storage.setItem(STORAGE_KEY, JSON.stringify(v2))
     const repo = new LocalStorageRepository(storage, commandDeps)
     const s = repo.load()
-    expect(s.schemaVersion).toBe(4)
+    expect(s.schemaVersion).toBe(5)
     expect(s.children.theodore.coins).toBe(45)
     expect(s.children.theodore.league.rank).toBe(3)
     expect(s.children.theodore.league.evaluatedWeeks['2026-10-05']).toEqual({ promoted: true })
@@ -204,7 +204,7 @@ describe('LocalStorageRepository', () => {
     const unsub = repo.subscribe(() => {
       calls += 1
     })
-    await repo.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'theodore-language', claimId: 'c1' })
+    await repo.dispatch({ type: 'claimQuest', childId: 'theodore', questId: 'spanish', claimId: 'c1' })
     expect(calls).toBe(1)
     await repo.dispatch({ type: 'approveClaim', claimId: 'nope' })
     expect(calls).toBe(1)
@@ -241,7 +241,7 @@ describe('LocalStorageRepository', () => {
     storage.setItem(STORAGE_KEY, JSON.stringify(v3))
     const repo = new LocalStorageRepository(storage, commandDeps)
     const s = repo.load()
-    expect(s.schemaVersion).toBe(4)
+    expect(s.schemaVersion).toBe(5)
     expect('parentPinHash' in s).toBe(false)
     expect(typeof s.timeZone).toBe('string')
     expect(s.timeZone.length).toBeGreaterThan(0)
@@ -250,5 +250,40 @@ describe('LocalStorageRepository', () => {
     expect(s.city.projects.road.status).toBe('open')
     expect(s.city.currentProjectId).toBe('library')
     expect(storage.dump().some((k) => k.includes('corrupt'))).toBe(false)
+  })
+})
+
+describe('v4 → v5 migration', () => {
+  it('stamps roles/rewards on old claims and installs both schedule entries', () => {
+    const storage = new FakeStorage()
+    const oldClaim = {
+      id: 'c1', childId: 'theodore', questId: 'theodore-language',
+      activityDate: '2026-10-01', status: 'approved',
+      claimedAt: '2026-10-01T10:00:00Z', decidedAt: '2026-10-01T11:00:00Z',
+    }
+    storage.setItem(STORAGE_KEY, JSON.stringify({
+      schemaVersion: 4,
+      createdAt: '2026-09-20T09:00:00Z',
+      timeZone: 'UTC',
+      children: {
+        theodore: { coins: 30, stars: 1, inventory: ['toy-train'], equipped: { hat: null, toy: 'toy-train' }, wishItem: null, league: { rank: 1, evaluatedWeeks: {}, unseenPromotion: null } },
+        leonard: { coins: 20, stars: 0, inventory: ['toy-train'], equipped: { hat: null, toy: 'toy-train' }, wishItem: null, league: { rank: 1, evaluatedWeeks: {}, unseenPromotion: null } },
+      },
+      claims: { c1: oldClaim },
+      purchases: {},
+      ledger: [],
+      settings: { sound: true },
+      city: { currentProjectId: 'road', suggestedProjectId: null, projects: { road: { kits: 0, status: 'building' }, library: { kits: 0, status: 'locked' }, 'music-school': { kits: 0, status: 'locked' }, 'police-station': { kits: 0, status: 'locked' }, hospital: { kits: 0, status: 'locked' } }, kitPurchases: {}, foundersBridgePlanks: 0 },
+    }))
+    const repo = new LocalStorageRepository(storage, commandDeps)
+    const s = repo.load()
+    expect(s.schemaVersion).toBe(5)
+    expect(s.claims.c1.role).toBe('core')
+    expect(s.claims.c1.reward).toEqual({ coins: 10, stars: 1 })
+    expect(s.scheduleHistory).toHaveLength(2)
+    expect(s.scheduleHistory[0].effectiveFrom).toBe('2026-09-20')
+    expect(s.config.theodore.mathLevel).toBe(2)
+    expect(s.config.leonard.mathLevel).toBe(1)
+    expect(s.pausedDates).toEqual({ theodore: [], leonard: [] })
   })
 })

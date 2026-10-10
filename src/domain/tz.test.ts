@@ -13,7 +13,7 @@ describe('time-zone-aware dates', () => {
     const late = new Date('2026-10-10T06:30:00Z')
     const r = claimQuest(
       s,
-      { childId: 'theodore', questId: 'theodore-language', claimId: 'c-late' },
+      { childId: 'theodore', questId: 'spanish', claimId: 'c-late' },
       late,
       deps,
     )

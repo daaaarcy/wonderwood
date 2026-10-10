@@ -1,4 +1,7 @@
 import type { ChildState, CityState, GameState, LeagueState } from './types.ts'
+import { DEFAULT_CHILD_CONFIG } from './migrate.ts'
+import { DEFAULT_SCHEDULE } from '../data/quests.ts'
+import { localDateKey } from './week.ts'
 import { WELCOME_COINS } from './types.ts'
 
 function initialCity(): CityState {
@@ -35,9 +38,14 @@ function initialChild(): ChildState {
 export function initialState(now: Date = new Date(), timeZone = 'UTC'): GameState {
   const at = now.toISOString()
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     timeZone,
     createdAt: at,
+    config: structuredClone(DEFAULT_CHILD_CONFIG),
+    scheduleHistory: [
+      { effectiveFrom: localDateKey(now, timeZone), schedule: structuredClone(DEFAULT_SCHEDULE) },
+    ],
+    pausedDates: { theodore: [], leonard: [] },
     children: {
       theodore: initialChild(),
       leonard: initialChild(),

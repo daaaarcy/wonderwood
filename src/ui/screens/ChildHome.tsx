@@ -4,20 +4,17 @@ import type { ChildId, ProjectId } from '../../domain/types'
 import { CHILDREN } from '../../data/children'
 import { itemById } from '../../data/catalogue'
 import { KIT_PRICE, PROJECTS, projectById } from '../../data/city'
-import { questsFor } from '../../data/quests'
+import { questById, type QuestDef } from '../../data/quests'
+import { QuestCard } from '../components/QuestCard'
+import { ReadingSheet } from '../components/ReadingSheet'
 import { assetUrl } from '../../game/assets'
 import { EventBus } from '../../game/EventBus'
 import { PhaserGame } from '../../game/PhaserGame'
 import { useGameState, useRepository, useRepoStatus } from '../../storage/hooks'
+import { ChallengeModal } from '../challenges/ChallengeModal'
 import { Celebration, type CelebrationData } from '../components/Celebration'
+import { ReadingJournal } from '../components/ReadingJournal'
 import { PromotionOverlay } from '../components/PromotionOverlay'
-
-function speak(text: string) {
-  if ('speechSynthesis' in window) {
-    speechSynthesis.cancel()
-    speechSynthesis.speak(new SpeechSynthesisUtterance(text))
-  }
-}
 
 /** Per-device record of building openings already celebrated. */
 const OPENINGS_KEY = 'wonderwood:seen-openings'
@@ -45,6 +42,10 @@ type Sheet =
   | { kind: 'plot'; projectId: ProjectId }
   | { kind: 'bridge'; planks: number }
   | { kind: 'buy-kit' }
+  | { kind: 'reading' }
+  | { kind: 'housework' }
+  | { kind: 'journal' }
+  | { kind: 'challenge'; quest: QuestDef }
 
 export function ChildHome({ childId }: { childId: ChildId }) {
   const state = useGameState()
@@ -57,18 +58,22 @@ export function ChildHome({ childId }: { childId: ChildId }) {
   const [celebration, setCelebration] = useState<CelebrationData | null>(null)
   const [opening, setOpening] = useState<ProjectId | null>(null)
   const [sheet, setSheet] = useState<Sheet | null>(null)
+  const sheetRef = useRef<Sheet | null>(null)
+  useEffect(() => {
+    sheetRef.current = sheet
+  }, [sheet])
+  // Defer closes slightly so the closing gesture's pointerup can't click-through
+  // to the town canvas underneath (would open a plot sheet).
+  const closeSheet = () => {
+    const current = sheetRef.current
+    setTimeout(() => setSheet((s) => (s === current ? null : s)), 140)
+  }
   const [busy, setBusy] = useState(false)
   const prev = useRef<{ childId: ChildId; coins: number; stars: number } | null>(null)
   const prevOpenings = useRef<Set<string> | null>(null)
 
   const city = state.city
-  const quests = questsFor(childId)
-  const today = todayQuestsFor(
-    state,
-    childId,
-    quests.map((q) => q.id),
-    new Date(),
-  )
+  const today = todayQuestsFor(state, childId, new Date())
 
   // League weeks end Sunday night — evaluate any that closed since last visit.
   useEffect(() => {
@@ -136,6 +141,9 @@ export function ChildHome({ childId }: { childId: ChildId }) {
   // Taps inside the scene bubble up as info sheets.
   useEffect(() => {
     const onTap = (e: { kind: string; projectId?: ProjectId; planks?: number }) => {
+      // Phaser listens at window level — a tap on a sheet above the canvas still
+      // reaches the scene. Ignore scene taps while any sheet/overlay is open.
+      if (sheetRef.current) return
       if (e.kind === 'plot' && e.projectId) setSheet({ kind: 'plot', projectId: e.projectId })
       if (e.kind === 'bridge' && e.planks) setSheet({ kind: 'bridge', planks: e.planks })
     }
@@ -162,7 +170,7 @@ export function ChildHome({ childId }: { childId: ChildId }) {
         projectId: city.currentProjectId,
         kitPurchaseId: crypto.randomUUID(),
       })
-      setSheet(null)
+      closeSheet()
     } finally {
       setBusy(false)
     }
@@ -256,67 +264,92 @@ export function ChildHome({ childId }: { childId: ChildId }) {
           )}
 
           <section className="quest-panel" aria-label="Today's quests">
-            {quests.map((quest) => {
-              const status = today.find((t) => t.questId === quest.id)
-              return (
-                <article key={quest.id} className={`quest-card quest-${status?.status ?? 'available'}`}>
-                  <span className={`quest-node node-${status?.status ?? 'available'}`}>
-                    <img src={assetUrl(quest.iconKey)} alt="" className="quest-icon" />
-                    {status?.status === 'pending' && (
-                      <svg className="node-mark" viewBox="0 0 24 24" aria-hidden="true">
-                        <circle cx="12" cy="12" r="9" fill="none" stroke="#fff" strokeWidth="3" />
-                        <path d="M12 7 v5 l3.5 2" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
-                      </svg>
-                    )}
-                    {status?.status === 'done' && (
-                      <svg className="node-mark" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M5 13 l4.5 4.5 L19 7" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </span>
-                  <p className="quest-label">{quest.label}</p>
-                  <button
-                    className="icon-btn speak-btn"
-                    aria-label={`Hear the quest: ${quest.label}`}
-                    onClick={() => speak(quest.label)}
-                  >
-                    <SpeakerIcon />
-                  </button>
-                  {status?.status === 'available' && (
-                    <button
-                      className="btn btn-big btn-yes"
-                      onClick={() =>
-                        // Fresh id per tap; double-tap safety lives in the domain's
-                        // one-active-claim-per-quest-per-day rule.
+            {today.restDay ? (
+              <article className="quest-card rest-card">
+                <p className="quest-label">Rest day — enjoy!</p>
+              </article>
+            ) : (
+              <>
+                {today.core.map((t) => {
+                  const quest = questById(t.questId)
+                  if (!quest) return null
+                  return (
+                    <QuestCard
+                      key={quest.id}
+                      quest={quest}
+                      status={t.status}
+                      childId={childId}
+                      offline={offline}
+                      openSheet={setSheet}
+                      claimQuest={(details) =>
                         void repo.dispatch({
                           type: 'claimQuest',
                           childId,
                           questId: quest.id,
                           claimId: crypto.randomUUID(),
+                          details,
                         })
                       }
-                    >
-                      I did it!
-                    </button>
-                  )}
-                  {status?.status === 'pending' && (
-                    <span className="quest-status">Waiting for a grown-up…</span>
-                  )}
-                  {status?.status === 'done' && (
-                    <span className="quest-status quest-done">
-                      <img src={assetUrl('star')} alt="" /> Done!
+                      subtitle={
+                        quest.id === 'violin'
+                          ? state.config[childId].violinGoal
+                          : quest.kind.type === 'external' && quest.kind.buttonLabel
+                            ? undefined
+                            : undefined
+                      }
+                    />
+                  )
+                })}
+
+                {today.bonus.length > 0 && (
+                  <div className="bonus-head">
+                    <span className="bonus-title">Bonus</span>
+                    <span className="bonus-pips" aria-label={`${today.bonusSlotsLeft} bonus coins left today`}>
+                      {today.bonusSlotsLeft > 0
+                        ? `Bonus coins left today: ${'●'.repeat(today.bonusSlotsLeft)}${'○'.repeat(2 - today.bonusSlotsLeft)}`
+                        : 'Bonus coins are full today — amazing effort!'}
                     </span>
-                  )}
-                </article>
-              )
-            })}
+                  </div>
+                )}
+                {today.bonus.map((t) => {
+                  const quest = questById(t.questId)
+                  if (!quest) return null
+                  return (
+                    <QuestCard
+                      key={quest.id}
+                      quest={quest}
+                      status={t.status}
+                      childId={childId}
+                      offline={offline}
+                      openSheet={setSheet}
+                      claimQuest={(details) =>
+                        void repo.dispatch({
+                          type: 'claimQuest',
+                          childId,
+                          questId: quest.id,
+                          claimId: crypto.randomUUID(),
+                          details,
+                        })
+                      }
+                    />
+                  )
+                })}
+
+                {(today.readingClaims.length > 0 ||
+                  today.core.some((t) => t.questId === 'reading')) && (
+                  <button className="btn btn-neutral journal-btn" onClick={() => setSheet({ kind: 'journal' })}>
+                    My reading journal
+                  </button>
+                )}
+              </>
+            )}
           </section>
         </div>
       </div>
 
       {/* bottom sheets */}
       {sheet?.kind === 'buy-kit' && current && (
-        <div className="sheet-backdrop" onClick={() => setSheet(null)}>
+        <div className="sheet-backdrop" onClick={closeSheet}>
           <div className="sheet" role="dialog" aria-label="Buy a building kit" onClick={(e) => e.stopPropagation()}>
             <img src={assetUrl('kit-box')} alt="" className="sheet-icon" />
             <p className="sheet-title">Add one kit to the {current.label} for {KIT_PRICE} coins?</p>
@@ -324,7 +357,7 @@ export function ChildHome({ childId }: { childId: ChildId }) {
               <button className="btn btn-yes" onClick={() => void buyKit()} disabled={busy}>
                 {busy ? 'Adding…' : 'Yes, add it!'}
               </button>
-              <button className="btn btn-neutral" onClick={() => setSheet(null)}>
+              <button className="btn btn-neutral" onClick={closeSheet}>
                 Not now
               </button>
             </div>
@@ -333,7 +366,7 @@ export function ChildHome({ childId }: { childId: ChildId }) {
       )}
 
       {sheet?.kind === 'plot' && sheetProject && sheetView && (
-        <div className="sheet-backdrop" onClick={() => setSheet(null)}>
+        <div className="sheet-backdrop" onClick={closeSheet}>
           <div
             className="sheet"
             role="dialog"
@@ -356,13 +389,13 @@ export function ChildHome({ childId }: { childId: ChildId }) {
                 className="btn"
                 onClick={() => {
                   void repo.dispatch({ type: 'suggestProject', childId, projectId: sheetProject.id })
-                  setSheet(null)
+                  closeSheet()
                 }}
               >
                 Suggest this
               </button>
             )}
-            <button className="btn btn-neutral" onClick={() => setSheet(null)}>
+            <button className="btn btn-neutral" onClick={closeSheet}>
               Close
             </button>
           </div>
@@ -370,17 +403,102 @@ export function ChildHome({ childId }: { childId: ChildId }) {
       )}
 
       {sheet?.kind === 'bridge' && (
-        <div className="sheet-backdrop" onClick={() => setSheet(null)}>
+        <div className="sheet-backdrop" onClick={closeSheet}>
           <div className="sheet" role="dialog" aria-label="Founders' Bridge" onClick={(e) => e.stopPropagation()}>
             <p className="sheet-title">Founders&rsquo; Bridge</p>
             <p className="muted">
               {sheet.planks} planks laid by Theodore &amp; Leonard on the old island.
             </p>
-            <button className="btn btn-neutral" onClick={() => setSheet(null)}>
+            <button className="btn btn-neutral" onClick={closeSheet}>
               Close
             </button>
           </div>
         </div>
+      )}
+
+      {sheet?.kind === 'reading' && (
+        <div className="sheet-backdrop" onClick={closeSheet}>
+          <ReadingSheet
+            onDone={(details) => {
+              void repo.dispatch({
+                type: 'claimQuest',
+                childId,
+                questId: 'reading',
+                claimId: crypto.randomUUID(),
+                details,
+              })
+              closeSheet()
+            }}
+          />
+        </div>
+      )}
+
+      {sheet?.kind === 'housework' && (
+        <div className="sheet-backdrop" onClick={closeSheet}>
+          <div className="sheet" role="dialog" aria-label="Choose the job" onClick={(e) => e.stopPropagation()}>
+            <p className="sheet-title">Which job did you do?</p>
+            <div className="sheet-actions">
+              {state.config[childId].houseworkJobs.map((job) => (
+                <button
+                  key={job}
+                  className="btn btn-neutral"
+                  onClick={() => {
+                    void repo.dispatch({
+                      type: 'claimQuest',
+                      childId,
+                      questId: 'housework',
+                      claimId: crypto.randomUUID(),
+                      details: { kind: 'housework', job },
+                    })
+                    closeSheet()
+                  }}
+                >
+                  {job}
+                </button>
+              ))}
+              <button className="btn btn-ghost" onClick={closeSheet}>
+                Not now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {sheet?.kind === 'journal' && (
+        <div className="sheet-backdrop" onClick={closeSheet}>
+          <div className="sheet journal-sheet" role="dialog" aria-label="Reading journal" onClick={(e) => e.stopPropagation()}>
+            <ReadingJournal state={state} childId={childId} />
+            <button className="btn btn-neutral" onClick={closeSheet}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sheet?.kind === 'challenge' && (
+        <ChallengeModal
+          childId={childId}
+          questId={sheet.quest.id}
+          level={state.config[childId].mathLevel}
+          runIndex={
+            today.restDay
+              ? 0
+              : Object.values(state.claims).filter(
+                  (c) =>
+                    c.childId === childId &&
+                    c.questId === sheet.quest.id &&
+                    c.activityDate === new Date().toISOString().slice(0, 10),
+                ).length
+          }
+          today={new Date().toISOString().slice(0, 10)}
+          replay={
+            !today.restDay &&
+            [...today.core, ...today.bonus].some(
+              (t) => t.questId === sheet.quest.id && t.status !== 'available',
+            )
+          }
+          onClose={closeSheet}
+        />
       )}
 
       {/* opening-day celebration */}
@@ -439,17 +557,3 @@ export function ChildHome({ childId }: { childId: ChildId }) {
   )
 }
 
-function SpeakerIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-      <path
-        d="M4 9 v6 h4 l6 5 V4 L8 9 Z"
-        fill="currentColor"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      <path d="M17 8 q3 4 0 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}

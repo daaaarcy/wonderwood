@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { localDateKey } from '../../domain/week'
 import { pendingClaims, todayQuestsFor } from '../../domain/selectors'
+import { rewardForApproval } from '../../domain/commands'
+import type { Claim } from '../../domain/types'
 import { CHILD_LIST } from '../../data/children'
-import { questById, questsFor } from '../../data/quests'
+import { questById } from '../../data/quests'
+import { ScheduleEditor } from '../components/ScheduleEditor'
 import { assetUrl } from '../../game/assets'
 import { useGameState, useRepository } from '../../storage/hooks'
 import { LeagueBadge } from '../components/LeagueBadge'
@@ -134,7 +137,20 @@ export function Grownups({ onExit }: { onExit: () => void }) {
                 <div className="claim-info">
                   <strong style={{ color: child?.darkColor }}>{child?.name}</strong>
                   <span>{quest?.label ?? claim.questId}</span>
-                  <span className="muted">{claim.activityDate}</span>
+                  <span className={`tag role-tag role-${claim.role}`}>
+                    {claim.role === 'core' ? 'Core' : 'Bonus'}
+                  </span>
+                  {claim.details && <span className="muted">{detailText(claim)}</span>}
+                  <span className="muted">
+                    {claim.activityDate}
+                    {' → '}
+                    {(() => {
+                      const r = rewardForApproval(state, claim)
+                      return r.coins > 0 || r.stars > 0
+                        ? `${r.coins > 0 ? `+${r.coins} coins` : ''}${r.stars > 0 ? ' +1★' : ''}`
+                        : 'recorded (0 coins)'
+                    })()}
+                  </span>
                 </div>
                 <div className="claim-actions">
                   <button
@@ -230,12 +246,7 @@ export function Grownups({ onExit }: { onExit: () => void }) {
       </section>
 
       {CHILD_LIST.map((child) => {
-        const todayStatuses = todayQuestsFor(
-          state,
-          child.id,
-          questsFor(child.id).map((q) => q.id),
-          new Date(),
-        )
+        const todayView = todayQuestsFor(state, child.id, new Date())
         const league = state.children[child.id].league
         return (
           <section key={child.id} className="panel">
@@ -245,45 +256,63 @@ export function Grownups({ onExit }: { onExit: () => void }) {
                 <LeagueBadge rank={league.rank} size={30} /> {leagueTitle(league.rank)}
               </span>
             </h3>
-            <ul className="claim-list">
-              {questsFor(child.id).map((quest) => {
-                const status = todayStatuses.find((t) => t.questId === quest.id)
-                return (
-                  <li key={quest.id} className="claim-row">
-                    <div className="claim-info">
-                      <img src={assetUrl(quest.iconKey)} alt="" className="quest-icon-small" />
-                      <span>{quest.label}</span>
-                    </div>
-                    <div className="claim-actions">
-                      {status?.status === 'available' && (
-                        <button
-                          className="btn btn-yes"
-                          onClick={() =>
-                            void repo.dispatch(
-                              {
-                                type: 'parentCompleteAndApprove',
-                                childId: child.id,
-                                questId: quest.id,
-                                claimId: `parent:${child.id}:${quest.id}:${today}`,
-                              },
-                              { pin: unlockedPin ?? undefined },
-                            )
-                          }
-                        >
-                          Done &amp; approve
-                        </button>
-                      )}
-                      {status?.status === 'pending' && <span className="tag tag-waiting">Waiting</span>}
-                      {status?.status === 'done' && (
-                        <span className="tag tag-done">
-                          <img src={assetUrl('star')} alt="" className="tag-star" /> Done
+            {todayView.restDay ? (
+              <p className="muted">Rest day today.</p>
+            ) : (
+              <ul className="claim-list">
+                {[...todayView.core, ...todayView.bonus].map((t) => {
+                  const quest = questById(t.questId)
+                  if (!quest) return null
+                  const isCore = todayView.core.some((c) => c.questId === t.questId)
+                  return (
+                    <li key={quest.id} className="claim-row">
+                      <div className="claim-info">
+                        <img src={assetUrl(quest.iconKey)} alt="" className="quest-icon-small" />
+                        <span>
+                          {quest.label}
+                          {quest.id === 'violin' && state.config[child.id].violinGoal && (
+                            <span className="muted"> — {state.config[child.id].violinGoal}</span>
+                          )}
                         </span>
-                      )}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+                        <span className={`tag role-tag role-${isCore ? 'core' : 'bonus'}`}>
+                          {isCore ? 'Core' : 'Bonus'}
+                        </span>
+                      </div>
+                      <div className="claim-actions">
+                        {t.status === 'available' && (
+                          <button
+                            className="btn btn-yes"
+                            onClick={() =>
+                              void repo.dispatch(
+                                {
+                                  type: 'parentCompleteAndApprove',
+                                  childId: child.id,
+                                  questId: quest.id,
+                                  claimId: `parent:${child.id}:${quest.id}:${today}`,
+                                },
+                                { pin: unlockedPin ?? undefined },
+                              )
+                            }
+                          >
+                            Done &amp; approve
+                          </button>
+                        )}
+                        {t.status === 'pending' && <span className="tag tag-waiting">Waiting</span>}
+                        {t.status === 'done' && (
+                          <span className="tag tag-done">
+                            <img src={assetUrl('star')} alt="" className="tag-star" /> Done
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+            <details className="schedule-disclosure">
+              <summary>Schedule &amp; settings</summary>
+              <ScheduleEditor childId={child.id} pin={unlockedPin} />
+            </details>
           </section>
         )
       })}
@@ -374,4 +403,18 @@ function DevicesSection({ devices }: { devices: DeviceApis }) {
       )}
     </>
   )
+}
+
+/** Short human summary of claim details for the approvals list. */
+function detailText(claim: Claim): string {
+  const d = claim.details
+  if (!d) return ''
+  if (d.kind === 'reading') {
+    return `${d.unit === 'book' ? 'Book' : 'Chapter'}${d.title ? ` “${d.title}”` : ''}${d.withGrownUp ? ' · with a grown-up' : ''}`
+  }
+  if (d.kind === 'challenge') {
+    return `${d.correctFirstTry} first-try · ${d.hintsUsed} hint${d.hintsUsed === 1 ? '' : 's'}`
+  }
+  if (d.kind === 'housework') return d.job
+  return ''
 }

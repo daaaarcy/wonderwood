@@ -1393,6 +1393,10 @@ button {
   padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
 }
 .sheet {
+  max-height: 86dvh;
+  overflow-y: auto;
+  max-height: 86dvh;
+  overflow-y: auto;
   background: var(--white);
   border: 2px solid var(--border);
   border-bottom-width: 5px;
@@ -1534,3 +1538,170 @@ button {
   color: #7a5b00;
   text-align: center;
 }
+
+/* ---------- quest cards v5 ---------- */
+.quest-text {
+  flex: 1;
+  min-width: 0;
+}
+.quest-sub {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+.quest-card:has(.quest-actions) {
+  flex-wrap: wrap;
+}
+.quest-actions {
+  display: flex;
+  gap: 8px;
+  flex: 1 0 100%;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+.quest-actions .btn {
+  flex: 1;
+  min-height: 50px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+}
+.rest-card {
+  justify-content: center;
+  background: var(--surface-alt, #f7f7f7);
+}
+.bonus-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 6px 4px 0;
+}
+.bonus-title {
+  font-weight: 900;
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+  color: var(--purple);
+  text-transform: uppercase;
+}
+.bonus-pips {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+.journal-btn {
+  margin-top: 4px;
+  margin-bottom: 12px;
+  scroll-margin-bottom: 90px;
+}
+
+/* ---------- challenge ---------- */
+.challenge-sheet {
+  max-width: 460px;
+  width: 100%;
+}
+.challenge-story {
+  font-weight: 900;
+  color: var(--orange);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+}
+.challenge-step { margin: 0; font-size: 0.8rem; }
+.challenge-prompt {
+  font-size: 1.35rem;
+  font-weight: 900;
+  margin: 6px 0 10px;
+  color: var(--text);
+}
+.challenge-picture { display: flex; gap: 14px; justify-content: center; }
+.challenge-pile {
+  font-size: 1.6rem;
+  max-width: 200px;
+  letter-spacing: 2px;
+  line-height: 1.5;
+  background: var(--surface-alt, #f7f7f7);
+  border-radius: 14px;
+  padding: 8px 12px;
+  min-height: 40px;
+}
+.challenge-hint {
+  background: #fff6d6;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.challenge-options {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 12px 0;
+}
+.challenge-opt { min-width: 84px; }
+.opt-picked { opacity: 0.4; }
+.challenge-try { color: var(--orange); font-weight: 800; margin: 0; }
+.challenge-right { color: var(--green); font-weight: 900; margin: 0; }
+.challenge-tools { display: flex; gap: 10px; justify-content: space-between; margin-top: 8px; }
+
+/* ---------- reading sheet + journal ---------- */
+.reading-units { display: flex; gap: 10px; }
+.reading-units .btn { flex: 1; }
+.journal-totals { font-weight: 900; font-size: 1.1rem; margin: 4px 0 10px; }
+.journal-list { list-style: none; margin: 0; padding: 0; max-height: 40vh; overflow-y: auto; }
+.journal-entry {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 4px;
+  border-bottom: 2px solid var(--border);
+  font-weight: 700;
+}
+.journal-sheet { max-width: 420px; width: 100%; }
+
+/* ---------- grown-ups: roles, schedule editor ---------- */
+.role-tag { font-size: 0.65rem; }
+.role-core { background: #e5f5d0; color: var(--green-lip); }
+.role-bonus { background: #f3e8ff; color: var(--purple-lip); }
+.schedule-disclosure { margin-top: 10px; }
+.schedule-disclosure summary {
+  font-weight: 800;
+  color: var(--blue);
+  cursor: pointer;
+  padding: 6px 0;
+}
+.schedule-editor h4 { margin: 14px 0 8px; font-size: 0.95rem; }
+.weekday-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+.weekday-col { display: flex; flex-direction: column; gap: 4px; }
+.weekday-name { font-weight: 900; font-size: 0.75rem; color: var(--text-secondary); text-align: center; }
+.sched-check {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 5px 6px;
+  cursor: pointer;
+}
+.sched-check input { display: none; }
+.sched-check.on { border-color: var(--green); background: #e5f5d0; }
+.sched-check:has(input:disabled) { opacity: 0.45; }
+.bonus-toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.bonus-toggles .sched-check { font-size: 0.8rem; padding: 8px 10px; }
+.pause-add { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+.pause-add .form-input { flex: 1; }
+.pause-list, .jobs-list { list-style: none; padding: 0; margin: 6px 0; }
+.pause-list li, .job-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.form-field { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; font-weight: 800; font-size: 0.85rem; }
+.form-field .form-input { font-weight: 700; }

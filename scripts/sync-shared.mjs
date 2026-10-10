@@ -11,12 +11,14 @@ const FILES = [
   'types.ts',
   'state.ts',
   'week.ts',
+  'migrate.ts',
+  'challenge.ts',
   'commands.ts',
   'quests.ts',
   'catalogue.ts',
   'city.ts',
 ]
-const SRC = { 'types.ts': 'src/domain', 'state.ts': 'src/domain', 'week.ts': 'src/domain', 'commands.ts': 'src/domain',
+const SRC = { 'types.ts': 'src/domain', 'state.ts': 'src/domain', 'week.ts': 'src/domain', 'commands.ts': 'src/domain', 'migrate.ts': 'src/domain', 'challenge.ts': 'src/domain',
               'quests.ts': 'src/data', 'catalogue.ts': 'src/data', 'city.ts': 'src/data' }
 const OUT = 'supabase/functions/_shared'
 
@@ -37,7 +39,7 @@ import { itemById } from './catalogue.ts'
 import { projectById } from './city.ts'
 
 export const commandDeps: CommandDeps = {
-  questExists: (questId) => questById(questId) !== undefined,
+  getQuest: (questId) => questById(questId),
   getItem: (itemId) => itemById(itemId),
   getProject: (projectId) => projectById(projectId),
 }

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- basket + broom, white glyph -->
+  <path d="M14 30 h36 l-4 22 q-1 4 -5 4 h-18 q-4 0 -5 -4 z" fill="#ffffff"/>
+  <path d="M18 30 l8 -14 M46 30 l-8 -14" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+  <path d="M20 40 h24 M21 47 h22" stroke="#58cc02" stroke-width="3" stroke-linecap="round"/>
+</svg>

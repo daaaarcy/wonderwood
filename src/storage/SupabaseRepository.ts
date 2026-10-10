@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { migrateState } from '../domain/migrate'
 import type { Command, GameState, Result } from '../domain/types'
 import { GROWN_UP_COMMANDS } from '../domain/commands'
 import type { GameRepository } from './GameRepository'
@@ -104,7 +105,8 @@ export class SupabaseRepository implements GameRepository {
 
   private adopt(row: { state: GameState; version: number }) {
     if (row.version <= this.version) return
-    this.state = row.state
+    this.state =
+      migrateState(row.state, { now: new Date(), timeZone: this.state.timeZone }) ?? row.state
     this.version = row.version
     for (const l of this.listeners) l(this.state)
   }

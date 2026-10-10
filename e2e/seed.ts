@@ -3,7 +3,7 @@ import { initialState } from '../src/domain/state'
 import { addDaysKey, localDateKey, mondayKeyOf } from '../src/domain/week'
 import type { GameState, ProjectId } from '../src/domain/types'
 import { commandDeps } from '../src/data/registry'
-import { questsFor } from '../src/data/quests'
+import { DEFAULT_SCHEDULE } from '../src/data/quests'
 
 /** JSON for localStorage['wonderwood:v1'] built through the real domain. */
 export function seedJson(state: GameState): string {
@@ -27,7 +27,7 @@ export function promotionSeed(): GameState {
   const lastMondayKey = addDaysKey(thisMonday, -7)
   const created = new Date(`${addDaysKey(thisMonday, -14)}T09:00:00Z`)
   let s = initialState(created, 'UTC')
-  const quests = questsFor('theodore')
+  const quests = (DEFAULT_SCHEDULE.theodore.core[0] ?? []).map((id) => ({ id }))
   for (let d = 0; d < 5; d += 1) {
     const day = new Date(`${addDaysKey(lastMondayKey, d)}T10:00:00Z`)
     for (const q of quests) {

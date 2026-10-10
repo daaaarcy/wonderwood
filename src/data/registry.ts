@@ -5,7 +5,7 @@ import { projectById } from './city.ts'
 
 /** Wires src/data lookups into the domain's injectable deps. */
 export const commandDeps: CommandDeps = {
-  questExists: (questId) => questById(questId) !== undefined,
+  getQuest: (questId) => questById(questId),
   getItem: (itemId) => itemById(itemId),
   getProject: (projectId) => projectById(projectId),
 }

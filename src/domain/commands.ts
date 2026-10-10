@@ -1,4 +1,5 @@
-import { addDaysKey, eligibleDays, localDateKey, mondayKeyOf } from './week.ts'
+import { addDaysKey, localDateKey, mondayKeyOf, weekdayOf } from './week.ts'
+import { scheduleForDate } from './migrate.ts'
 import type {
   ChildId,
   Claim,
@@ -6,6 +7,7 @@ import type {
   Command,
   CommandDeps,
   CommandOutcome,
+  DaySchedule,
   DomainError,
   GameState,
   LedgerEntry,
@@ -13,7 +15,7 @@ import type {
   Purchase,
   Result,
 } from './types.ts'
-import { CHILD_IDS, MAX_LEAGUE_RANK, QUEST_REWARD } from './types.ts'
+import { BONUS_REWARD, BONUS_SLOTS_PER_DAY, CHILD_IDS, CORE_REWARD, MAX_LEAGUE_RANK } from './types.ts'
 
 const ok = <T>(value: T): Result<T> => ({ ok: true, value })
 const err = (code: DomainError['code'], message: string): Result<never> => ({
@@ -48,18 +50,61 @@ function addLedger(state: GameState, entry: LedgerEntry): GameState {
   return { ...state, ledger: [...state.ledger, entry] }
 }
 
-function awardQuest(state: GameState, childId: ChildId, claimId: string, at: string): GameState {
+/** How many bonus-coin rewards this child already got on `dateKey`. */
+function bonusRewardsUsed(state: GameState, childId: ChildId, dateKey: string): number {
+  return Object.values(state.claims).filter(
+    (c) =>
+      c.childId === childId &&
+      c.activityDate === dateKey &&
+      c.status === 'approved' &&
+      c.reward?.coins === BONUS_REWARD.coins,
+  ).length
+}
+
+/** Did this quest already pay its core reward for that child on that day? */
+function coreRewardUsed(state: GameState, childId: ChildId, questId: string, dateKey: string): boolean {
+  return Object.values(state.claims).some(
+    (c) =>
+      c.childId === childId &&
+      c.questId === questId &&
+      c.activityDate === dateKey &&
+      c.status === 'approved' &&
+      (c.reward?.stars ?? 0) > 0,
+  )
+}
+
+/**
+ * The reward an approval gives. Core = 10+★; repeats of the same core quest
+ * (e.g. extra reading units) fall through to a bonus slot; bonus = +5 while
+ * the two shared daily bonus slots last, then 0 but still recorded.
+ * Exported so the grown-up approvals list can preview the reward.
+ */
+export function rewardForApproval(state: GameState, claim: Claim): { coins: number; stars: number } {
+  const isFirstCoreForQuest =
+    claim.role === 'core' && !coreRewardUsed(state, claim.childId, claim.questId, claim.activityDate)
+  if (isFirstCoreForQuest) return CORE_REWARD
+  const used = bonusRewardsUsed(state, claim.childId, claim.activityDate)
+  return used < BONUS_SLOTS_PER_DAY ? BONUS_REWARD : { coins: 0, stars: 0 }
+}
+
+function awardQuest(
+  state: GameState,
+  childId: ChildId,
+  claimId: string,
+  reward: { coins: number; stars: number },
+  at: string,
+): GameState {
   const child = state.children[childId]
   const next = withChild(state, childId, {
     ...child,
-    coins: child.coins + QUEST_REWARD.coins,
-    stars: child.stars + QUEST_REWARD.stars,
+    coins: child.coins + reward.coins,
+    stars: child.stars + reward.stars,
   })
   return addLedger(next, {
     id: `quest-${claimId}`,
     childId,
-    coins: QUEST_REWARD.coins,
-    stars: QUEST_REWARD.stars,
+    coins: reward.coins,
+    stars: reward.stars,
     reason: 'quest',
     refId: claimId,
     at,
@@ -83,16 +128,50 @@ function approvedClaimsInWeek(state: GameState, childId: ChildId, weekKey: strin
   )
 }
 
-/** Does this child qualify for promotion from week `weekKey` right now? */
-function weekQualifies(state: GameState, childId: ChildId, weekKey: string): boolean {
+/**
+ * Eligible days + opportunities in week `weekKey` for a child: days ≥ createdAt,
+ * ≤ throughKey, not paused, with ≥1 scheduled core quest.
+ */
+export function weekEligibility(
+  state: GameState,
+  childId: ChildId,
+  weekKey: string,
+  throughKey: string,
+): { eligibleDays: number; opportunities: number } {
   const createdKey = localDateKey(new Date(state.createdAt), state.timeZone)
   const sunday = addDaysKey(weekKey, 6)
-  const eligible = eligibleDays(weekKey, createdKey, sunday)
+  const through = throughKey < sunday ? throughKey : sunday
+  let days = 0
+  let opportunities = 0
+  for (let d = weekKey; d <= through; d = addDaysKey(d, 1)) {
+    if (d < createdKey) continue
+    if (state.pausedDates[childId].includes(d)) continue
+    const weekday = (weekdayOf(d) + 6) % 7 // 0=Mon..6=Sun
+    const core = scheduleForDate(state, d)[childId].core[weekday] ?? []
+    if (core.length > 0) {
+      days += 1
+      opportunities += core.length
+    }
+  }
+  return { eligibleDays: days, opportunities }
+}
+
+/** Approved claims that carried the core reward (the first approval per quest/day). */
+function approvedCoreClaimsInWeek(state: GameState, childId: ChildId, weekKey: string): Claim[] {
+  return approvedClaimsInWeek(state, childId, weekKey).filter(
+    (c) => c.role === 'core' && (c.reward?.stars ?? 1) > 0,
+  )
+}
+
+/** Does this child qualify for promotion from week `weekKey` right now? */
+function weekQualifies(state: GameState, childId: ChildId, weekKey: string): boolean {
+  const sunday = addDaysKey(weekKey, 6)
+  const { eligibleDays: eligible, opportunities } = weekEligibility(state, childId, weekKey, sunday)
   if (eligible < MIN_ELIGIBLE_DAYS) return false
-  const claims = approvedClaimsInWeek(state, childId, weekKey)
+  const claims = approvedCoreClaimsInWeek(state, childId, weekKey)
   const count = claims.length
   const activeDays = new Set(claims.map((c) => c.activityDate)).size
-  return count >= Math.ceil(PROMOTION_FRACTION * 3 * eligible) && activeDays >= MIN_ACTIVE_DAYS
+  return count >= Math.ceil(PROMOTION_FRACTION * opportunities) && activeDays >= MIN_ACTIVE_DAYS
 }
 
 /** Apply a one-league promotion to `child` (cap at MAX). */
@@ -191,13 +270,28 @@ export function acknowledgePromotion(
 
 /* ---------------- Claims ---------------- */
 
+/** The schedule role a quest has for a child on a date; null when neither. */
+export function questRoleOn(
+  state: GameState,
+  childId: ChildId,
+  questId: string,
+  dateKey: string,
+): 'core' | 'bonus' | null {
+  const weekday = (weekdayOf(dateKey) + 6) % 7
+  const day = scheduleForDate(state, dateKey)[childId]
+  if ((day.core[weekday] ?? []).includes(questId)) return 'core'
+  if (day.bonus.includes(questId)) return 'bonus'
+  return null
+}
+
 function insertClaim(
   state: GameState,
-  cmd: { childId: ChildId; questId: string; claimId: string },
+  cmd: { childId: ChildId; questId: string; claimId: string; details?: Claim['details'] },
   now: Date,
   deps: CommandDeps,
 ): CommandOutcome<Claim> {
-  if (!deps.questExists(cmd.questId)) {
+  const quest = deps.getQuest(cmd.questId)
+  if (!quest || quest.retired || !quest.childIds.includes(cmd.childId)) {
     return { state, result: err('unknown-quest', 'That quest does not exist.') }
   }
   const existing = state.claims[cmd.claimId]
@@ -206,7 +300,17 @@ function insertClaim(
     return { state, result: ok(existing) }
   }
   const activityDate = localDateKey(now, state.timeZone)
-  const clash = findActiveClaim(state, cmd.childId, cmd.questId, activityDate)
+  if (state.pausedDates[cmd.childId].includes(activityDate)) {
+    return { state, result: err('rest-day', 'Today is a rest day — enjoy!') }
+  }
+  const role = questRoleOn(state, cmd.childId, cmd.questId, activityDate)
+  if (!role) {
+    return { state, result: err('not-scheduled', 'That is not on the plan today.') }
+  }
+  // Reading is always loggable — extra books/chapters become bonus or journal
+  // entries at approval time.
+  const multi = cmd.questId === 'reading'
+  const clash = multi ? undefined : findActiveClaim(state, cmd.childId, cmd.questId, activityDate)
   if (clash) {
     return {
       state,
@@ -218,15 +322,17 @@ function insertClaim(
     childId: cmd.childId,
     questId: cmd.questId,
     activityDate,
+    role,
     status: 'pending',
     claimedAt: now.toISOString(),
+    details: cmd.details,
   }
   return { state: withClaim(state, claim), result: ok(claim) }
 }
 
 export function claimQuest(
   state: GameState,
-  cmd: { childId: ChildId; questId: string; claimId: string },
+  cmd: { childId: ChildId; questId: string; claimId: string; details?: Claim['details'] },
   now: Date,
   deps: CommandDeps,
 ): CommandOutcome<Claim> {
@@ -252,8 +358,9 @@ export function approveClaim(
     return { state, result: err('claim-not-pending', 'This claim was already rejected.') }
   }
   const decidedAt = now.toISOString()
-  const approved: Claim = { ...claim, status: 'approved', decidedAt }
-  let next = awardQuest(withClaim(state, approved), claim.childId, claim.id, decidedAt)
+  const reward = rewardForApproval(state, claim)
+  const approved: Claim = { ...claim, status: 'approved', decidedAt, reward }
+  let next = awardQuest(withClaim(state, approved), claim.childId, claim.id, reward, decidedAt)
   next = recheckWeekAfterApproval(next, approved)
   return { state: next, result: ok(approved) }
 }
@@ -281,7 +388,7 @@ export function rejectClaim(
 
 export function parentCompleteAndApprove(
   state: GameState,
-  cmd: { childId: ChildId; questId: string; claimId: string },
+  cmd: { childId: ChildId; questId: string; claimId: string; details?: Claim['details'] },
   now: Date,
   deps: CommandDeps,
 ): CommandOutcome<Claim> {
@@ -416,6 +523,117 @@ export function setWish(
   }
   const child = state.children[cmd.childId]
   const next = withChild(state, cmd.childId, { ...child, wishItem: cmd.itemId })
+  return { state: next, result: ok(next) }
+}
+
+/* ---------------- Grown-up schedule & config ---------------- */
+
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+export function updateSchedule(
+  state: GameState,
+  cmd: { childId: ChildId; core: Record<number, string[]>; bonus: string[]; effectiveFrom?: string },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<GameState> {
+  const childId = cmd.childId
+  const bonusSet = new Set(cmd.bonus)
+  for (const [day, list] of Object.entries(cmd.core)) {
+    const d = Number(day)
+    if (!Number.isInteger(d) || d < 0 || d > 6 || !Array.isArray(list)) {
+      return { state, result: err('invalid-schedule', 'Days must be 0–6 lists.') }
+    }
+    if (list.length > 3) {
+      return { state, result: err('invalid-schedule', 'At most 3 core quests per day.') }
+    }
+    for (const q of list) {
+      const def = deps.getQuest(q)
+      if (!def || def.retired || !def.childIds.includes(childId)) {
+        return { state, result: err('invalid-schedule', `"${q}" is not available for this child.`) }
+      }
+      if (bonusSet.has(q)) {
+        return { state, result: err('invalid-schedule', 'A quest cannot be both core and bonus.') }
+      }
+    }
+  }
+  for (const q of cmd.bonus) {
+    const def = deps.getQuest(q)
+    if (!def || def.retired || !def.childIds.includes(childId)) {
+      return { state, result: err('invalid-schedule', `"${q}" is not available for this child.`) }
+    }
+  }
+  const effectiveFrom = cmd.effectiveFrom ?? localDateKey(now, state.timeZone)
+  if (!DATE_KEY_RE.test(effectiveFrom)) {
+    return { state, result: err('invalid-schedule', 'effectiveFrom must be a date.') }
+  }
+  const latest = state.scheduleHistory[state.scheduleHistory.length - 1].schedule
+  const next: GameState = {
+    ...state,
+    scheduleHistory: [
+      ...state.scheduleHistory,
+      {
+        effectiveFrom,
+        schedule: {
+          ...latest,
+          [childId]: { core: { ...cmd.core }, bonus: [...cmd.bonus] } satisfies DaySchedule,
+        },
+      },
+    ],
+  }
+  return { state: next, result: ok(next) }
+}
+
+export function setPaused(
+  state: GameState,
+  cmd: { childId: ChildId; dates: string[]; paused: boolean },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<GameState> {
+  void now
+  void deps
+  if (!cmd.dates.every((d) => DATE_KEY_RE.test(d))) {
+    return { state, result: err('invalid-schedule', 'Dates must be YYYY-MM-DD.') }
+  }
+  const current = new Set(state.pausedDates[cmd.childId])
+  for (const d of cmd.dates) {
+    if (cmd.paused) current.add(d)
+    else current.delete(d)
+  }
+  const next: GameState = {
+    ...state,
+    pausedDates: { ...state.pausedDates, [cmd.childId]: [...current].sort() },
+  }
+  return { state: next, result: ok(next) }
+}
+
+export function updateChildConfig(
+  state: GameState,
+  cmd: { childId: ChildId; patch: Partial<GameState['config'][ChildId]> },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<GameState> {
+  void now
+  void deps
+  const p = cmd.patch
+  if (p.mathLevel !== undefined && ![1, 2, 3].includes(p.mathLevel)) {
+    return { state, result: err('invalid-config', 'Math level must be 1, 2, or 3.') }
+  }
+  if (p.violinGoal !== undefined && typeof p.violinGoal !== 'string') {
+    return { state, result: err('invalid-config', 'The violin goal must be text.') }
+  }
+  if (p.typingUrl !== undefined && p.typingUrl !== null && !/^https?:\/\//.test(p.typingUrl)) {
+    return { state, result: err('invalid-config', 'The typing link must be a URL.') }
+  }
+  if (p.houseworkJobs !== undefined && !Array.isArray(p.houseworkJobs)) {
+    return { state, result: err('invalid-config', 'Housework jobs must be a list.') }
+  }
+  const next: GameState = {
+    ...state,
+    config: {
+      ...state.config,
+      [cmd.childId]: { ...state.config[cmd.childId], ...cmd.patch },
+    },
+  }
   return { state: next, result: ok(next) }
 }
 
@@ -557,6 +775,9 @@ export const GROWN_UP_COMMANDS: ReadonlySet<Command['type']> = new Set([
   'rejectClaim',
   'parentCompleteAndApprove',
   'chooseNextProject',
+  'updateSchedule',
+  'setPaused',
+  'updateChildConfig',
 ])
 
 export function setSound(
@@ -604,5 +825,11 @@ export function applyCommand(
       return suggestProject(state, cmd, now, deps)
     case 'chooseNextProject':
       return chooseNextProject(state, cmd, now, deps)
+    case 'updateSchedule':
+      return updateSchedule(state, cmd, now, deps)
+    case 'setPaused':
+      return setPaused(state, cmd, now, deps)
+    case 'updateChildConfig':
+      return updateChildConfig(state, cmd, now, deps)
   }
 }
