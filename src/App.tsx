@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ChildId } from './domain/types'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { LEAGUES } from './data/leagues'
 import { RepositoryProvider } from './storage/repo-context'
 import { useRepository } from './storage/hooks'
@@ -33,10 +34,41 @@ function BadgeGallery() {
   )
 }
 
+/**
+ * Offline fake of the Supabase surface Onboarding uses — lets every onboarding
+ * screen be exercised/screenshot in local mode via `?onboard`.
+ */
+function stubSupabase(): SupabaseClient {
+  const listeners = new Set<(event: string, session: unknown) => void>()
+  return {
+    auth: {
+      onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
+        listeners.add(cb)
+        return { data: { subscription: { unsubscribe: () => listeners.delete(cb) } } }
+      },
+      signInWithPassword: async () => {
+        const session = { user: { id: 'qa-grownup' } }
+        for (const cb of listeners) cb('SIGNED_IN', session)
+        return { data: { session }, error: null }
+      },
+      signUp: async () => ({ data: {}, error: null }),
+      signInAnonymously: async () => ({ data: { user: { id: 'qa-kid' }, session: {} }, error: null }),
+    },
+    functions: {
+      invoke: async () => ({ data: { householdId: 'qa-household' }, error: null }),
+    },
+  } as unknown as SupabaseClient
+}
+
 function Shell() {
   const [screen, setScreen] = useState<Screen>('picker')
   const [childId, setChildId] = useState<ChildId | null>(null)
+  const [onboardDone, setOnboardDone] = useState(false)
   const repo = useRepository()
+  const qaOnboard = useMemo(
+    () => new URLSearchParams(window.location.search).has('onboard'),
+    [],
+  )
 
   // Close out any fully-ended league weeks at app start.
   useEffect(() => {
@@ -45,6 +77,9 @@ function Shell() {
 
   if (new URLSearchParams(window.location.search).has('badges')) {
     return <BadgeGallery />
+  }
+  if (qaOnboard && !onboardDone) {
+    return <Onboarding sb={stubSupabase()} onHousehold={() => setOnboardDone(true)} />
   }
 
   const pickChild = (id: ChildId) => {

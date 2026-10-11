@@ -100,7 +100,12 @@ export function WordPic({ id, size = 64 }: { id: WordId; size?: number }) {
     case 'moon':
       return (
         <svg {...s} aria-hidden="true">
-          <path d="M40 10 A22 22 0 1 0 40 54 A17 17 0 1 1 40 10 Z" fill="#f2c40f" />
+          {/* crescent: full disc with a second disc punched out via even-odd */}
+          <path
+            fill="#f2c40f"
+            fillRule="evenodd"
+            d="M6 32 a24 24 0 1 0 48 0 a24 24 0 1 0 -48 0 M21 25 a21 21 0 1 0 42 0 a21 21 0 1 0 -42 0"
+          />
         </svg>
       )
   }

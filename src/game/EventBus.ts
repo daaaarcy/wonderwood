@@ -10,7 +10,12 @@ export const EventBus = new Phaser.Events.EventEmitter()
 // Test hooks: let e2e specs drive scene taps deterministically.
 if (typeof window !== 'undefined') {
   ;(window as unknown as { __townTap?: (projectId: string) => void }).__townTap = (projectId) =>
-    EventBus.emit('town-tap', { kind: 'plot', projectId })
+    EventBus.emit(
+      'town-tap',
+      projectId === 'bridge' ? { kind: 'bridge', planks: 7 } : { kind: 'plot', projectId },
+    )
+  ;(window as unknown as { __townTruck?: () => void }).__townTruck = () =>
+    EventBus.emit('town-tap', { kind: 'truck' })
   ;(window as unknown as { __roomTap?: (spot: string) => void }).__roomTap = (spot) =>
     EventBus.emit('room-tap', { spot })
 }
