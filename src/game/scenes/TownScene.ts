@@ -1,5 +1,7 @@
 import Phaser from 'phaser'
-import { EventBus } from '../EventBus'
+import { EventBus, tapOnCanvas } from '../EventBus'
+import { lookKey, registerLookTextures, type ExplorerPose } from '../avatarSvg'
+import type { AvatarLook } from '../../domain/avatar'
 import { GAME_HEIGHT, GAME_WIDTH } from '../assets'
 import { CHILDREN } from '../../data/children'
 import { PROJECTS, type ProjectDef } from '../../data/city'
@@ -14,6 +16,8 @@ export interface TownStatePayload {
   foundersPlanks: number
   cityName: string | null
   looks: Record<ProjectId, { color: string | null; name: string | null }>
+  /** v9: each explorer's avatar look (drives generated textures). */
+  avatars?: Record<ChildId, AvatarLook>
 }
 
 const EXPLORER_HEIGHT = 118
@@ -39,6 +43,34 @@ export class TownScene extends Phaser.Scene {
   private bg!: Phaser.GameObjects.Image
   private explorers = {} as Record<ChildId, Phaser.GameObjects.Container>
   private explorerHats = {} as Record<ChildId, Phaser.GameObjects.Image | null>
+  /** Generated texture keys per child/pose once the look's art exists. */
+  private avatarKeys: Record<ChildId, Partial<Record<ExplorerPose, string>>> = {
+    theodore: {},
+    leonard: {},
+  }
+  private lastLookKey: Record<ChildId, string> = { theodore: '', leonard: '' }
+
+  /** Texture key for an explorer pose — generated look if loaded, else the
+   *  static default SVG from preload. */
+  private texKey(id: ChildId, pose: ExplorerPose): string {
+    const gen = this.avatarKeys[id][pose]
+    if (gen && this.textures.exists(gen)) return gen
+    return `explorer-${id}${pose === 'idle' ? '' : `-${pose}`}`
+  }
+
+  /** Generate runtime textures for a new look, then re-skin the body sprite. */
+  private ensureAvatar(id: ChildId, look: AvatarLook) {
+    const k = lookKey(look)
+    if (this.lastLookKey[id] === k) return
+    this.lastLookKey[id] = k
+    registerLookTextures(this, `av-${id}-${k}`, look, (keys) => {
+      if (!this.sys?.displayList) return
+      this.avatarKeys[id] = keys
+      const outer = this.explorers[id]
+      const body = outer?.getData('body') as Phaser.GameObjects.Image | undefined
+      if (body?.scene && !outer.getData('cheering')) body.setTexture(this.texKey(id, 'idle'))
+    })
+  }
   private rendered = new Map<ProjectId, RenderedProject>()
   private truck: Phaser.GameObjects.Image | null = null
   private truckPath!: Phaser.Curves.Path
@@ -90,7 +122,8 @@ export class TownScene extends Phaser.Scene {
         new Phaser.Geom.Rectangle(-105, -85, 210, 170),
         Phaser.Geom.Rectangle.Contains,
       )
-      container.on('pointerdown', () => {
+      container.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        if (!tapOnCanvas(pointer)) return
         EventBus.emit('town-tap', { kind: 'plot', projectId: def.id })
         this.tweens.add({ targets: container, scale: 1.04, duration: 120, yoyo: true })
       })
@@ -377,7 +410,7 @@ export class TownScene extends Phaser.Scene {
       const outer = this.add.container(SQUARE_POS[id].x, SQUARE_POS[id].y)
       const bobber = this.add.container(0, 0)
       const body = this.add
-        .image(0, 0, `explorer-${id}`)
+        .image(0, 0, this.texKey(id, 'idle'))
         .setOrigin(0.5, 1)
         .setDisplaySize((EXPLORER_HEIGHT * 200) / 240, EXPLORER_HEIGHT)
       bobber.add(body)
@@ -386,7 +419,9 @@ export class TownScene extends Phaser.Scene {
       outer.setData('bobber', bobber)
       outer.setSize(90, EXPLORER_HEIGHT)
       outer.setInteractive({ useHandCursor: true })
-      outer.on('pointerdown', () => this.tapExplorer(id))
+      outer.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        if (tapOnCanvas(pointer)) this.tapExplorer(id)
+      })
       this.explorers[id] = outer
       this.explorerHats[id] = null
     }
@@ -416,8 +451,8 @@ export class TownScene extends Phaser.Scene {
     l.setData('cheering', true)
     const tb = t.getData('body') as Phaser.GameObjects.Image
     const lb = l.getData('body') as Phaser.GameObjects.Image
-    tb.setTexture('explorer-theodore-cheer')
-    lb.setTexture('explorer-leonard-cheer')
+    tb.setTexture(this.texKey('theodore', 'cheer'))
+    lb.setTexture(this.texKey('leonard', 'cheer'))
     // hop toward each other
     for (const [c, dir] of [[t, -1], [l, 1]] as const) {
       const bobber = c.getData('bobber') as Phaser.GameObjects.Container
@@ -449,8 +484,8 @@ export class TownScene extends Phaser.Scene {
     this.time.delayedCall(900, () => {
       t.setData('cheering', false)
       l.setData('cheering', false)
-      if (tb.scene) tb.setTexture('explorer-theodore')
-      if (lb.scene) lb.setTexture('explorer-leonard')
+      if (tb.scene) tb.setTexture(this.texKey('theodore', 'idle'))
+      if (lb.scene) lb.setTexture(this.texKey('leonard', 'idle'))
     })
   }
 
@@ -473,7 +508,7 @@ export class TownScene extends Phaser.Scene {
     const homeX = outer.x
     const homeY = outer.y
     // hop in — explorer rides the cab, cheering/waving
-    body.setTexture(`explorer-${childId}-cheer`)
+    body.setTexture(this.texKey(childId, 'cheer'))
     this.tweens.add({
       targets: outer,
       x: truck.x,
@@ -501,7 +536,7 @@ export class TownScene extends Phaser.Scene {
               duration: 420,
               ease: 'Quad.easeOut',
               onComplete: () => {
-                if (body.scene) body.setTexture(`explorer-${childId}`)
+                if (body.scene) body.setTexture(this.texKey(childId, 'idle'))
                 this.riding = false
               },
             })
@@ -516,7 +551,7 @@ export class TownScene extends Phaser.Scene {
     const body = outer.getData('body') as Phaser.GameObjects.Image
     if (outer.getData('cheering')) return
     outer.setData('cheering', true)
-    body.setTexture(`explorer-${id}-cheer`)
+    body.setTexture(this.texKey(id, 'cheer'))
     this.tweens.add({
       targets: outer.getData('bobber') as Phaser.GameObjects.Container,
       y: -24,
@@ -525,7 +560,7 @@ export class TownScene extends Phaser.Scene {
       ease: 'Quad.easeOut',
       onComplete: () => {
         outer.setData('cheering', false)
-        if (body.scene) body.setTexture(`explorer-${id}`)
+        if (body.scene) body.setTexture(this.texKey(id, 'idle'))
       },
     })
   }
@@ -539,9 +574,9 @@ export class TownScene extends Phaser.Scene {
           const outer = this.explorers[id]
           if (!outer || outer.getData('cheering')) continue
           const body = outer.getData('body') as Phaser.GameObjects.Image
-          body.setTexture(`explorer-${id}-blink`)
+          body.setTexture(this.texKey(id, 'blink'))
           this.time.delayedCall(140, () => {
-            if (body.scene && !outer.getData('cheering')) body.setTexture(`explorer-${id}`)
+            if (body.scene && !outer.getData('cheering')) body.setTexture(this.texKey(id, 'idle'))
           })
         }
       },
@@ -580,7 +615,8 @@ export class TownScene extends Phaser.Scene {
     this.truck.setDisplaySize(92, 60)
     this.truck.setVisible(false)
     this.truck.setInteractive({ useHandCursor: true })
-    this.truck.on('pointerdown', () => {
+    this.truck.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (!tapOnCanvas(pointer)) return
       const truck = this.truck
       if (!truck) return
       // honk bounce
@@ -709,9 +745,10 @@ export class TownScene extends Phaser.Scene {
       .setOrigin(0.5)
     plaque.add([pg, label])
     plaque.setSize(112, 32).setInteractive({ useHandCursor: true })
-    plaque.on('pointerdown', () =>
-      EventBus.emit('town-tap', { kind: 'bridge', planks: this.foundersPlanks }),
-    )
+    plaque.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (!tapOnCanvas(pointer)) return
+      EventBus.emit('town-tap', { kind: 'bridge', planks: this.foundersPlanks })
+    })
     c.add([g, plaque])
   }
 
@@ -999,6 +1036,12 @@ export class TownScene extends Phaser.Scene {
 
   private applyState(payload: TownStatePayload) {
     if (!this.sys.displayList) return
+    if (payload.avatars) {
+      for (const id of ['theodore', 'leonard'] as const) {
+        const look = payload.avatars[id]
+        if (look) this.ensureAvatar(id, look)
+      }
+    }
     this.looks = payload.looks
     this.foundersPlanks = payload.foundersPlanks
     this.buildFoundersBridge()

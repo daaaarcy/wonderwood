@@ -10,9 +10,11 @@ export type ChildTab = 'home' | 'shop' | 'room' | 'league'
 
 interface Props {
   childId: ChildId
-  tab: ChildTab
+  tab: ChildTab | 'look'
   onTab: (tab: ChildTab) => void
   onSwitch: () => void
+  /** Opens the avatar editor screen. */
+  onLook?: () => void
   children: React.ReactNode
 }
 
@@ -60,7 +62,15 @@ const TABS: { id: ChildTab; label: string }[] = [
   { id: 'league', label: 'League' },
 ]
 
-function ExplorerMenu({ childId, onSwitch }: { childId: ChildId; onSwitch: () => void }) {
+function ExplorerMenu({
+  childId,
+  onSwitch,
+  onLook,
+}: {
+  childId: ChildId
+  onSwitch: () => void
+  onLook?: () => void
+}) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const state = useGameState()
@@ -96,6 +106,16 @@ function ExplorerMenu({ childId, onSwitch }: { childId: ChildId; onSwitch: () =>
             className="btn btn-neutral btn-small menu-item"
             onClick={() => {
               setOpen(false)
+              onLook?.()
+            }}
+          >
+            Change my look
+          </button>
+          <button
+            role="menuitem"
+            className="btn btn-neutral btn-small menu-item"
+            onClick={() => {
+              setOpen(false)
               onSwitch()
             }}
           >
@@ -107,14 +127,14 @@ function ExplorerMenu({ childId, onSwitch }: { childId: ChildId; onSwitch: () =>
   )
 }
 
-export function ChildChrome({ childId, tab, onTab, onSwitch, children }: Props) {
+export function ChildChrome({ childId, tab, onTab, onSwitch, onLook, children }: Props) {
   const state = useGameState()
   const child = state.children[childId]
 
   return (
     <div className="chrome">
       <header className="stat-bar">
-        <ExplorerMenu childId={childId} onSwitch={onSwitch} />
+        <ExplorerMenu childId={childId} onSwitch={onSwitch} onLook={onLook} />
         <span className="stat-name">{CHILDREN[childId].name}</span>
         <div className="stat-spacer" />
         <div className="stat-chips">

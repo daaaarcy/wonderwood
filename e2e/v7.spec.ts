@@ -109,6 +109,7 @@ test('custom task: grown-up creates → only assigned child sees → claim → a
   await unlockGrownups(page)
 
   // Tasks panel → add a task just for Theodore
+  await page.getByRole('button', { name: 'Tasks' }).click()
   const panel = page.locator('.tasks-panel')
   await panel.getByTestId('add-task').click()
   await panel.getByPlaceholder('e.g. Water the plants').fill('Water the plants')
@@ -119,7 +120,7 @@ test('custom task: grown-up creates → only assigned child sees → claim → a
   await expect(panel.locator('.task-row').first()).toContainText('Every day')
 
   // back to the picker → Theodore sees the card under "From grown-ups"
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
   await pickExplorer(page, 'Theodore')
   await expect(page.getByText('From grown-ups')).toBeVisible()
   const card = page.getByTestId('custom-card')
@@ -145,7 +146,7 @@ test('custom task: grown-up creates → only assigned child sees → claim → a
   await row.getByRole('button', { name: 'Approve' }).click()
 
   // back to Theodore: coins 20 + 10 stars 0 + 2, card shows done
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
   await pickExplorer(page, 'Theodore')
   await expect(page.getByTestId('coin-count')).toHaveText('30')
   await expect(page.getByTestId('star-count')).toHaveText('2')
@@ -186,6 +187,7 @@ test('custom task: pause hides it; archived claim keeps its title', async ({ pag
   await page.getByLabel('Explorer menu').click()
   await page.getByRole('menuitem', { name: 'Switch explorer' }).click()
   await unlockGrownups(page)
+  await page.getByRole('button', { name: 'Tasks' }).click()
   const panel = page.locator('.tasks-panel')
   await panel.locator('.paused-tasks summary').click()
   await expect(panel.locator('.task-row').first()).toContainText('Feed the fish')

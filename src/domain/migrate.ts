@@ -17,6 +17,7 @@ import {
   DEFAULT_SCHEDULE,
   LEGACY_SCHEDULE,
 } from '../data/quests.ts'
+import { DEFAULT_LOOKS, isValidLook } from './avatar.ts'
 
 /* ---------------- older shapes ---------------- */
 
@@ -63,6 +64,15 @@ type GameStateV5 = Omit<GameStateV6, 'schemaVersion' | 'weekly' | 'badges' | 're
 
 /** v7 shape: v8 minus the dropped default housework job. */
 type GameStateV7 = Omit<GameState, 'schemaVersion'> & { schemaVersion: 7 }
+
+/** Child shape before v9 added `look`. */
+type ChildStateV8 = Omit<ChildState, 'look'>
+
+/** v8 shape: v9 minus avatar looks. */
+type GameStateV8 = Omit<GameState, 'schemaVersion' | 'children'> & {
+  schemaVersion: 8
+  children: Record<ChildId, ChildStateV8>
+}
 
 /* ---------------- validators ---------------- */
 
@@ -131,6 +141,19 @@ function isValidV7(value: Record<string, unknown>): boolean {
   if (!isRecord(s.customQuests)) return false
   for (const id of ['theodore', 'leonard'] as const) {
     if (!isRecord(s.children[id].placed)) return false
+  }
+  return true
+}
+
+function isValidV8(value: Record<string, unknown>): boolean {
+  return isValidV7(value)
+}
+
+function isValidV9(value: Record<string, unknown>): boolean {
+  if (!isValidV8(value)) return false
+  const s = value as unknown as GameState
+  for (const id of ['theodore', 'leonard'] as const) {
+    if (!isValidLook(s.children[id].look)) return false
   }
   return true
 }
@@ -211,11 +234,24 @@ export const DEFAULT_CHILD_CONFIG: Record<ChildId, ChildConfig> = {
 /** Default housework job removed in v8. */
 const RETIRED_JOB = 'Put napkins on the table'
 
+/** v8 → v9: every explorer gets their default look. */
+function migrateV8(v8: GameStateV8): GameState {
+  return {
+    ...v8,
+    schemaVersion: 9,
+    children: {
+      theodore: { ...v8.children.theodore, look: { ...DEFAULT_LOOKS.theodore } },
+      leonard: { ...v8.children.leonard, look: { ...DEFAULT_LOOKS.leonard } },
+    },
+  }
+}
+
 /** v7 → v8: drop the retired default job from each child's job list. */
-function migrateV7(v7: GameStateV7): GameState {
+function migrateV7(v7: GameStateV7): GameStateV8 {
   return {
     ...v7,
     schemaVersion: 8,
+    children: v7.children as Record<ChildId, ChildStateV8>,
     config: {
       theodore: {
         ...v7.config.theodore,
@@ -305,28 +341,32 @@ export function migrateState(raw: unknown, ctx: MigrateCtx): GameState | null {
       v2 = isValidV2(value) ? (value as unknown as GameStateV2) : null
     }
     if (v2)
-      return migrateV7(migrateV6(migrateV5(migrateV4(migrateV3(migrateV2(v2), ctx.timeZone), ctx))))
+      return migrateV8(migrateV7(migrateV6(migrateV5(migrateV4(migrateV3(migrateV2(v2), ctx.timeZone), ctx)))))
     if (version === 3) {
       const v3 = isValidV3(value) ? (value as unknown as GameStateV3) : null
-      return v3 ? migrateV7(migrateV6(migrateV5(migrateV4(migrateV3(v3, ctx.timeZone), ctx)))) : null
+      return v3 ? migrateV8(migrateV7(migrateV6(migrateV5(migrateV4(migrateV3(v3, ctx.timeZone), ctx))))) : null
     }
     if (version === 4) {
       const v4 = isValidV4(value) ? (value as unknown as GameStateV4) : null
-      return v4 ? migrateV7(migrateV6(migrateV5(migrateV4(v4, ctx)))) : null
+      return v4 ? migrateV8(migrateV7(migrateV6(migrateV5(migrateV4(v4, ctx))))) : null
     }
     if (version === 5) {
       const v5 = isValidV5(value) ? (value as unknown as GameStateV5) : null
-      return v5 ? migrateV7(migrateV6(migrateV5(v5))) : null
+      return v5 ? migrateV8(migrateV7(migrateV6(migrateV5(v5)))) : null
     }
     if (version === 6) {
       const v6 = isValidV6(value) ? (value as unknown as GameStateV6) : null
-      return v6 ? migrateV7(migrateV6(v6)) : null
+      return v6 ? migrateV8(migrateV7(migrateV6(v6))) : null
     }
     if (version === 7) {
       const v7 = isValidV7(value) ? (value as unknown as GameStateV7) : null
-      return v7 ? migrateV7(v7) : null
+      return v7 ? migrateV8(migrateV7(v7)) : null
     }
-    if (version === 8) return isValidV7(value) ? (value as unknown as GameState) : null
+    if (version === 8) {
+      const v8 = isValidV8(value) ? (value as unknown as GameStateV8) : null
+      return v8 ? migrateV8(v8) : null
+    }
+    if (version === 9) return isValidV9(value) ? (value as unknown as GameState) : null
     return null
   } catch {
     return null

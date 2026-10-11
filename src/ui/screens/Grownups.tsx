@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { localDateKey } from '../../domain/week'
 import { pendingClaims, todayQuestsFor } from '../../domain/selectors'
 import { rewardForApproval } from '../../domain/commands'
-import type { Claim } from '../../domain/types'
+import type { ChildId, Claim } from '../../domain/types'
 import { CHILD_LIST } from '../../data/children'
 import { questById } from '../../data/quests'
 import { ScheduleEditor } from '../components/ScheduleEditor'
@@ -16,11 +16,72 @@ import { PROJECTS, projectById } from '../../data/city'
 
 type PinStage = 'set' | 'confirm' | 'enter'
 
+type GuTab = 'approve' | 'tasks' | 'schedule' | 'repair' | 'settings'
+
+const GU_TABS: { id: GuTab; label: string }[] = [
+  { id: 'approve', label: 'Approve' },
+  { id: 'tasks', label: 'Tasks' },
+  { id: 'schedule', label: 'Schedule' },
+  { id: 'repair', label: 'Repair' },
+  { id: 'settings', label: 'Settings' },
+]
+
+/** Flat pictograms matching the child nav's icon style. */
+function GuTabIcon({ tab }: { tab: GuTab }) {
+  const p = { width: 26, height: 26, viewBox: '0 0 24 24', 'aria-hidden': true } as const
+  switch (tab) {
+    case 'approve':
+      return (
+        <svg {...p}>
+          <path d="M12 2 a10 10 0 1 0 0.001 0 Z" fill="currentColor" opacity="0.18" />
+          <path d="M6.5 12.5 l4 4 l7.5 -8.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    case 'tasks':
+      return (
+        <svg {...p}>
+          <rect x="5" y="4" width="14" height="17" rx="2.5" fill="currentColor" />
+          <rect x="9" y="2" width="6" height="4" rx="2" fill="currentColor" />
+          <path d="M8.5 10.5 h7 M8.5 14.5 h7 M8.5 18.5 h4" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      )
+    case 'schedule':
+      return (
+        <svg {...p}>
+          <rect x="4" y="5" width="16" height="15" rx="2.5" fill="currentColor" />
+          <rect x="4" y="5" width="16" height="5" rx="2.5" fill="currentColor" opacity="0.7" />
+          <path d="M8 2.5 V7 M16 2.5 V7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          <circle cx="8.5" cy="14" r="1.5" fill="#ffffff" />
+          <circle cx="12" cy="14" r="1.5" fill="#ffffff" />
+          <circle cx="15.5" cy="14" r="1.5" fill="#ffffff" />
+          <circle cx="8.5" cy="17.5" r="1.5" fill="#ffffff" />
+          <circle cx="12" cy="17.5" r="1.5" fill="#ffffff" />
+        </svg>
+      )
+    case 'repair':
+      return (
+        <svg {...p}>
+          <path d="M12 20 C6 15.5 3.5 12.5 3.5 9 A4.5 4.5 0 0 1 12 6.5 A4.5 4.5 0 0 1 20.5 9 C20.5 12.5 18 15.5 12 20 Z" fill="currentColor" />
+          <path d="M8.5 10.5 h7 M12 7 v7" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+      )
+    case 'settings':
+      return (
+        <svg {...p}>
+          <circle cx="12" cy="12" r="3.2" fill="currentColor" />
+          <path d="M12 2.5 v3.4 M12 18.1 v3.4 M2.5 12 h3.4 M18.1 12 h3.4 M5.2 5.2 l2.4 2.4 M16.4 16.4 l2.4 2.4 M18.8 5.2 l-2.4 2.4 M7.6 16.4 l-2.4 2.4" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+        </svg>
+      )
+  }
+}
+
 export function Grownups({ onExit }: { onExit: () => void }) {
   const state = useGameState()
   const repo = useRepository()
   const gate = repo.gate
   const [unlockedPin, setUnlockedPin] = useState<string | null>(null)
+  const [guTab, setGuTab] = useState<GuTab>('approve')
+  const [scheduleChild, setScheduleChild] = useState<ChildId>('theodore')
   const [stage, setStage] = useState<{ ready: boolean; stage: PinStage }>({ ready: false, stage: 'set' })
   const [firstPin, setFirstPin] = useState('')
   const [entry, setEntry] = useState('')
@@ -125,8 +186,15 @@ export function Grownups({ onExit }: { onExit: () => void }) {
 
   return (
     <div className="screen grownups-screen">
-      <h2 className="screen-title">Grown-ups</h2>
+      <header className="grownups-head">
+        <h2 className="screen-title">Grown-ups</h2>
+        <button className="btn btn-neutral btn-small" onClick={onExit}>
+          Back to explorers
+        </button>
+      </header>
 
+      <div className="grownups-body">
+      {guTab === 'approve' && (<>
       <section className="panel pending-panel">
         <h3>Waiting for you</h3>
         {pending.length === 0 && <p className="muted">Nothing waiting — all caught up!</p>}
@@ -174,10 +242,11 @@ export function Grownups({ onExit }: { onExit: () => void }) {
           })}
         </ul>
       </section>
+      </>)}
 
-      <TasksPanel pin={unlockedPin} />
+      {guTab === 'tasks' && <TasksPanel pin={unlockedPin} />}
 
-      {state.city.currentProjectId === null && (
+      {guTab === 'approve' && state.city.currentProjectId === null && (
         <section className="panel next-building" aria-label="Choose the next building">
           <h3>Next building</h3>
           {state.city.suggestedProjectId && (
@@ -217,6 +286,7 @@ export function Grownups({ onExit }: { onExit: () => void }) {
         </section>
       )}
 
+      {guTab === 'settings' && (<>
       {repo.devices && (
         <section className="panel" aria-label="Devices">
           <h3>Devices</h3>
@@ -249,8 +319,9 @@ export function Grownups({ onExit }: { onExit: () => void }) {
           </button>
         </label>
       </section>
+      </>)}
 
-      {CHILD_LIST.map((child) => {
+      {guTab === 'approve' && CHILD_LIST.map((child) => {
         const todayView = todayQuestsFor(state, child.id, new Date())
         const league = state.children[child.id].league
         return (
@@ -326,19 +397,54 @@ export function Grownups({ onExit }: { onExit: () => void }) {
                 })}
               </ul>
             )}
-            <details className="schedule-disclosure">
-              <summary>Schedule &amp; settings</summary>
-              <ScheduleEditor childId={child.id} pin={unlockedPin} />
-            </details>
           </section>
         )
       })}
 
-      <RepairsPanel pin={unlockedPin} />
+      {guTab === 'schedule' && (
+        <section className="panel" aria-label="Schedule">
+          <div className="segmented" role="tablist" aria-label="Choose child">
+            {CHILD_LIST.map((c) => (
+              <button
+                key={c.id}
+                role="tab"
+                aria-selected={scheduleChild === c.id}
+                className={`segment ${scheduleChild === c.id ? 'segment-active' : ''}`}
+                onClick={() => setScheduleChild(c.id)}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+          <p className="muted league-rule-note">
+            League rule: finish at least 70% of the week&rsquo;s quests on 3 or more days → up
+            one league on Sunday. Never moves down.
+          </p>
+          <ScheduleEditor childId={scheduleChild} pin={unlockedPin} />
+        </section>
+      )}
 
-      <button className="btn btn-ghost" onClick={onExit}>
-        Done — back to explorers
-      </button>
+      {guTab === 'repair' && <RepairsPanel pin={unlockedPin} />}
+      </div>
+
+      <nav className="main-nav grownups-nav" aria-label="Grown-ups sections">
+        {GU_TABS.map((t) => (
+          <button
+            key={t.id}
+            className={`tab ${guTab === t.id ? 'tab-active' : ''}`}
+            aria-current={guTab === t.id ? 'page' : undefined}
+            onClick={() => setGuTab(t.id)}
+          >
+            <GuTabIcon tab={t.id} />
+            <span>{t.label}</span>
+            {t.id === 'approve' && pending.length > 0 && (
+              <span className="tab-badge" aria-label={`${pending.length} waiting`}>
+                {pending.length}
+              </span>
+            )}
+          </button>
+        ))}
+      </nav>
     </div>
   )
 }

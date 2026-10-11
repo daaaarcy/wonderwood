@@ -15,8 +15,9 @@ import { Grownups } from './ui/screens/Grownups'
 import { LeagueScreen } from './ui/screens/LeagueScreen'
 import { Shop } from './ui/screens/Shop'
 import { RoomScreen } from './ui/screens/RoomScreen'
+import { AvatarEditor } from './ui/screens/AvatarEditor'
 
-export type Screen = 'picker' | 'grownups' | ChildTab
+export type Screen = 'picker' | 'grownups' | 'look' | ChildTab
 
 function BadgeGallery() {
   return (
@@ -63,6 +64,8 @@ function stubSupabase(): SupabaseClient {
 function Shell() {
   const [screen, setScreen] = useState<Screen>('picker')
   const [childId, setChildId] = useState<ChildId | null>(null)
+  /** Where "Change my look" was opened from — return there on Done/Cancel. */
+  const [lookReturn, setLookReturn] = useState<ChildTab>('home')
   const [onboardDone, setOnboardDone] = useState(false)
   const repo = useRepository()
   const qaOnboard = useMemo(
@@ -94,11 +97,31 @@ function Shell() {
     return <ProfilePicker onPick={pickChild} onGrownups={() => setScreen('grownups')} />
   }
   return (
-    <ChildChrome childId={childId} tab={screen} onTab={setScreen} onSwitch={() => setScreen('picker')}>
+    <ChildChrome
+      childId={childId}
+      tab={screen}
+      onTab={(t) => setScreen(t)}
+      onSwitch={() => setScreen('picker')}
+      onLook={() => {
+        if (screen !== 'look') setLookReturn(screen)
+        setScreen('look')
+      }}
+    >
       {screen === 'shop' && <Shop childId={childId} />}
-      {screen === 'room' && <RoomScreen childId={childId} />}
+      {screen === 'room' && (
+        <RoomScreen
+          childId={childId}
+          onEditLook={() => {
+            setLookReturn('room')
+            setScreen('look')
+          }}
+        />
+      )}
       {screen === 'league' && <LeagueScreen childId={childId} />}
       {screen === 'home' && <ChildHome childId={childId} />}
+      {screen === 'look' && (
+        <AvatarEditor childId={childId} onDone={() => setScreen(lookReturn)} />
+      )}
     </ChildChrome>
   )
 }

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
-import { assetUrl } from '../../game/assets'
+import { explorerDataUrl } from '../../game/avatarSvg'
 import { MusicNoteIcon } from '../components/FlatIcons'
+import { useGameState } from '../../storage/hooks'
 
 const NOTES = [
   { name: 'C', freq: 261.63, color: '#e0483e' },
@@ -17,6 +18,7 @@ const NOTES = [
 const TUNE: number[] = [0, 2, 4, 0, 4, 5, 4, 2, 0, 4, 7, 4, 5, 4, 2, 0]
 
 export function MusicPlay({ soundOn }: { soundOn: boolean }) {
+  const state = useGameState()
   const ctxRef = useRef<AudioContext | null>(null)
   const [show, setShow] = useState(false)
   const [hitBar, setHitBar] = useState<number | null>(null)
@@ -68,8 +70,8 @@ export function MusicPlay({ soundOn }: { soundOn: boolean }) {
         <div className="stage-floor" aria-hidden="true" />
         <div className="spotlight spot-left" aria-hidden="true" />
         <div className="spotlight spot-right" aria-hidden="true" />
-        <img src={assetUrl('explorer-theodore')} alt="Theodore" className="stage-explorer bop-left" />
-        <img src={assetUrl('explorer-leonard')} alt="Leonard" className="stage-explorer bop-right" />
+        <img src={explorerDataUrl(state.children.theodore.look)} alt="Theodore" className="stage-explorer bop-left" />
+        <img src={explorerDataUrl(state.children.leonard.look)} alt="Leonard" className="stage-explorer bop-right" />
         {Array.from({ length: Math.min(notes, 6) }).map((_, i) => (
           <span key={`${notes}-${i}`} className="float-note" style={{ left: `${22 + i * 11}%` }}>
             <MusicNoteIcon size={26} />

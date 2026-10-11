@@ -51,7 +51,7 @@ describe('v6 → v7 migration', () => {
       delete (v6.children as Record<string, Record<string, unknown>>)[id].placed
     }
     const s = migrateState(v6, { now: NOW, timeZone: TZ })
-    expect(s?.schemaVersion).toBe(8)
+    expect(s?.schemaVersion).toBe(9)
     expect(s?.customQuests).toEqual({})
     expect(s?.children.theodore.placed).toEqual({})
     expect(s?.children.leonard.placed).toEqual({})
@@ -72,7 +72,7 @@ describe('v6 → v7 migration', () => {
     const jobs = (v7.config as Record<string, { houseworkJobs: string[] }>).theodore.houseworkJobs
     jobs.push('Put napkins on the table', 'Feed the fish')
     const s = migrateState(v7, { now: NOW, timeZone: TZ })
-    expect(s?.schemaVersion).toBe(8)
+    expect(s?.schemaVersion).toBe(9)
     expect(s?.config.theodore.houseworkJobs).not.toContain('Put napkins on the table')
     expect(s?.config.theodore.houseworkJobs).toContain('Feed the fish')
   })

@@ -56,7 +56,7 @@ try {
   const hid = ch.data?.householdId
   created.households.push(hid)
   check('createHousehold', !!hid)
-  check('household state is v8 + tz', ch.data?.state?.schemaVersion === 8 && ch.data?.state?.timeZone === 'America/Los_Angeles')
+  check('household state is v9 + tz', ch.data?.state?.schemaVersion === 9 && ch.data?.state?.timeZone === 'America/Los_Angeles')
 
   // anonymous cannot createHousehold
   mark('stranger anon'); const { error: ae } = await stranger.auth.signInAnonymously()
@@ -184,6 +184,13 @@ try {
   // child-allowed: nameCity without PIN
   const nc = await fn(kid, { action: 'command', householdId: hid, command: { type: 'nameCity', childId: 'theodore', name: 'Sunny Town' } })
   check('nameCity is child-allowed (no PIN)', nc.data?.result?.ok === true)
+
+  // v9: setLook is child-allowed; invalid look rejected
+  const goodLook = { skin: '#ffd3ac', hair: 'spiky', hairColor: '#1cb0f6', eyes: 'sparkle', mouth: 'grin', glasses: 'round', shirt: '#58cc02', scarf: '#ff4b4b' }
+  const sl = await fn(kid, { action: 'command', householdId: hid, command: { type: 'setLook', childId: 'theodore', look: goodLook } })
+  check('setLook is child-allowed (no PIN)', sl.data?.result?.ok === true && sl.data?.state?.children?.theodore?.look?.hair === 'spiky')
+  const badLook = await fn(kid, { action: 'command', householdId: hid, command: { type: 'setLook', childId: 'theodore', look: { ...goodLook, hair: 'afro' } } })
+  check('invalid look rejected', badLook.data?.result?.ok === false && badLook.data?.result?.error?.code === 'invalid-look')
 
   // --- v7: custom tasks need PIN to write; placeItem is child-allowed ---
   mark('v7 custom tasks')

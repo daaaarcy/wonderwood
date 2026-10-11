@@ -16,6 +16,7 @@ import { QuestCard } from '../components/QuestCard'
 import { CustomQuestCard } from '../components/CustomQuestCard'
 import { ReadingSheet } from '../components/ReadingSheet'
 import { assetUrl } from '../../game/assets'
+import { explorerDataUrl } from '../../game/avatarSvg'
 import { EventBus } from '../../game/EventBus'
 import { PhaserGame } from '../../game/PhaserGame'
 import { useGameState, useRepository, useRepoStatus } from '../../storage/hooks'
@@ -175,6 +176,10 @@ export function ChildHome({ childId }: { childId: ChildId }) {
           { color: city.projects[p.id].color ?? null, name: city.projects[p.id].name ?? null },
         ]),
       ) as Record<ProjectId, { color: string | null; name: string | null }>,
+      avatars: {
+        theodore: state.children.theodore.look,
+        leonard: state.children.leonard.look,
+      },
     })
   }, [state, sceneReady, city])
 
@@ -727,8 +732,8 @@ export function ChildHome({ childId }: { childId: ChildId }) {
           </div>
           <div className="celebration-card">
             <div className="opening-explorers">
-              <img className="celebration-cheer" src={assetUrl('explorer-theodore-cheer')} alt="" />
-              <img className="celebration-cheer cheer-right" src={assetUrl('explorer-leonard-cheer')} alt="" />
+              <img className="celebration-cheer" src={explorerDataUrl(state.children.theodore.look, 'cheer')} alt="" />
+              <img className="celebration-cheer cheer-right" src={explorerDataUrl(state.children.leonard.look, 'cheer')} alt="" />
             </div>
             <p className="celebration-text">The {projectById(opening)?.label} is open!</p>
             <p className="celebration-sub">The whole town says thank you!</p>

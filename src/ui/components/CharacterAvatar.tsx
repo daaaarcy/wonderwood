@@ -1,6 +1,9 @@
 import { assetUrl } from '../../game/assets'
+import { explorerDataUrl, type ExplorerPose } from '../../game/avatarSvg'
 import { itemById } from '../../data/catalogue'
 import { CHILDREN, EXPLORER_VIEWBOX } from '../../data/children'
+import { useGameState } from '../../storage/hooks'
+import type { AvatarLook } from '../../domain/avatar'
 import type { ChildId } from '../../domain/types'
 
 interface Props {
@@ -11,6 +14,9 @@ interface Props {
   className?: string
   /** Show just the head (stat bar / menus). */
   headOnly?: boolean
+  /** Preview a draft look (avatar editor); defaults to the child's saved look. */
+  look?: AvatarLook
+  pose?: ExplorerPose
 }
 
 /**
@@ -18,8 +24,10 @@ interface Props {
  * the child's headAnchor — the same anchor math the Phaser scenes use, so the
  * shop preview matches the game world.
  */
-export function CharacterAvatar({ childId, hatItemId, size, className, headOnly }: Props) {
+export function CharacterAvatar({ childId, hatItemId, size, className, headOnly, look, pose }: Props) {
+  const state = useGameState()
   const def = CHILDREN[childId]
+  const effectiveLook = look ?? state.children[childId].look
   const hat = hatItemId ? itemById(hatItemId) : undefined
   const anchor = hat?.anchor ?? { x: 0.5, y: 0.85 }
   const inner = (
@@ -32,7 +40,7 @@ export function CharacterAvatar({ childId, hatItemId, size, className, headOnly 
     >
       <img
         className="avatar-body"
-        src={assetUrl(def.explorerKey)}
+        src={explorerDataUrl(effectiveLook, pose ?? 'idle')}
         alt={def.name}
         draggable={false}
       />

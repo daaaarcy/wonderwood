@@ -57,7 +57,7 @@ test('full loop: claim → approve → buy → room → persistence', async ({ p
   await expect(claimRow).toBeHidden()
 
   // --- back to Theodore: coins + plank ---
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
   await pickExplorer(page, 'Theodore')
   await dismissCelebration(page)
   await expect(page.getByTestId('coin-count')).toHaveText('30')
@@ -103,7 +103,7 @@ test('double-clicking Approve awards the quest only once', async ({ page }) => {
   await enterGrownups(page)
   const row = page.locator('.pending-panel .claim-row', { hasText: 'Typing practice' })
   await row.getByRole('button', { name: 'Approve' }).dblclick()
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
   await pickExplorer(page, 'Theodore')
   await dismissCelebration(page)
   await expect(page.getByTestId('coin-count')).toHaveText('30')
@@ -126,7 +126,7 @@ test('claim → reject → re-claim → approve awards +10 once', async ({ page 
     .click()
 
   // child can claim again the same day
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
   await pickExplorer(page, 'Theodore')
   await card.getByRole('button', { name: 'I did it!' }).click()
   await expect(card.getByText('Waiting for a grown-up')).toBeVisible()
@@ -138,7 +138,7 @@ test('claim → reject → re-claim → approve awards +10 once', async ({ page 
     .locator('.pending-panel .claim-row')
     .getByRole('button', { name: 'Approve' })
     .click()
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
   await pickExplorer(page, 'Theodore')
   await dismissCelebration(page)
   await expect(page.getByTestId('coin-count')).toHaveText('30')

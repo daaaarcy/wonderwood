@@ -3,6 +3,7 @@ import { DEFAULT_CHILD_CONFIG } from './migrate.ts'
 import { DEFAULT_SCHEDULE } from '../data/quests.ts'
 import { localDateKey } from './week.ts'
 import { WELCOME_COINS } from './types.ts'
+import { DEFAULT_LOOKS } from './avatar.ts'
 
 function initialCity(): CityState {
   return {
@@ -24,7 +25,7 @@ function initialLeague(): LeagueState {
   return { rank: 1, evaluatedWeeks: {}, unseenPromotion: null }
 }
 
-function initialChild(): ChildState {
+function initialChild(id: 'theodore' | 'leonard'): ChildState {
   return {
     coins: WELCOME_COINS,
     stars: 0,
@@ -33,13 +34,14 @@ function initialChild(): ChildState {
     placed: {},
     wishItem: null,
     league: initialLeague(),
+    look: { ...DEFAULT_LOOKS[id] },
   }
 }
 
 export function initialState(now: Date = new Date(), timeZone = 'UTC'): GameState {
   const at = now.toISOString()
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     timeZone,
     createdAt: at,
     config: structuredClone(DEFAULT_CHILD_CONFIG),
@@ -48,8 +50,8 @@ export function initialState(now: Date = new Date(), timeZone = 'UTC'): GameStat
     ],
     pausedDates: { theodore: [], leonard: [] },
     children: {
-      theodore: initialChild(),
-      leonard: initialChild(),
+      theodore: initialChild('theodore'),
+      leonard: initialChild('leonard'),
     },
     claims: {},
     purchases: {},

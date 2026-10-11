@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { projectById } from '../../data/city'
 import { assetUrl } from '../../game/assets'
+import { explorerDataUrl } from '../../game/avatarSvg'
 import type { GameState, Postcard } from '../../domain/types'
 
 /** The building's little flat portrait — same art as the town. */
-function BuildingScene({ color, iconKey, name }: { color: string; iconKey: string; name: string }) {
+function BuildingScene({ color, iconKey, name, theoUrl, leoUrl }: { color: string; iconKey: string; name: string; theoUrl: string; leoUrl: string }) {
   return (
     <svg className="postcard-scene-art" viewBox="0 0 320 170" aria-hidden="true">
       {/* sky + sun + grass */}
@@ -43,14 +44,16 @@ function BuildingScene({ color, iconKey, name }: { color: string; iconKey: strin
         </text>
       </g>
       {/* waving explorers */}
-      <image href={assetUrl('explorer-theodore-cheer')} x="60" y="92" height="62" />
-      <image href={assetUrl('explorer-leonard-cheer')} x="220" y="92" height="62" />
+      <image href={theoUrl} x="60" y="92" height="62" />
+      <image href={leoUrl} x="220" y="92" height="62" />
     </svg>
   )
 }
 
 /** A collectible postcard stamped the day a building opened. */
 export function PostcardCard({ postcard, state, big }: { postcard: Postcard; state: GameState; big?: boolean }) {
+  const theoUrl = explorerDataUrl(state.children.theodore.look, 'cheer')
+  const leoUrl = explorerDataUrl(state.children.leonard.look, 'cheer')
   const project = state.city.projects[postcard.projectId]
   const def = projectById(postcard.projectId)
   const color = project.color ?? def?.color ?? '#4a9ede'
@@ -69,7 +72,7 @@ export function PostcardCard({ postcard, state, big }: { postcard: Postcard; sta
           <circle cx="20" cy="8" r="4" fill="#58cc02" />
         </svg>
       </div>
-      <BuildingScene color={color} iconKey={def?.iconKey ?? 'icon-library'} name={buildingName} />
+      <BuildingScene color={color} iconKey={def?.iconKey ?? 'icon-library'} name={buildingName} theoUrl={theoUrl} leoUrl={leoUrl} />
       <div className="postcard-caption">
         <p className="postcard-sub">
           {state.city.name ? `Greetings from ${state.city.name}!` : 'Greetings from our town!'}

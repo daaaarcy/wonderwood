@@ -1,5 +1,7 @@
 import Phaser from 'phaser'
-import { EventBus } from '../EventBus'
+import { EventBus, tapOnCanvas } from '../EventBus'
+import { lookKey, registerLookTextures, type ExplorerPose } from '../avatarSvg'
+import type { AvatarLook } from '../../domain/avatar'
 import { GAME_HEIGHT, GAME_WIDTH } from '../assets'
 import { itemById } from '../../data/catalogue'
 import type { ChildId, FurnitureSpot } from '../../domain/types'
@@ -12,6 +14,8 @@ export interface RoomStatePayload {
   toy: string | null
   /** furniture item ids per room spot (v7). */
   placed: Partial<Record<FurnitureSpot, string>>
+  /** v9: the explorer's avatar look (drives generated textures). */
+  look?: AvatarLook
 }
 
 const EXPLORER_HEIGHT = 250
@@ -82,6 +86,35 @@ export class RoomScene extends Phaser.Scene {
   private smokeTimer = 0
   private furnitureItems: Phaser.GameObjects.Image[] = []
   private lastPlaced = ''
+  private avatarKeys: Partial<Record<ExplorerPose, string>> = {}
+  private avatarKeysChild: string = ''
+  private lastLookKey = ''
+
+  /** Texture key for the room child's pose — generated look if loaded, else
+   *  the static default SVG. */
+  private texKey(pose: ExplorerPose): string {
+    const gen = this.avatarKeys[pose]
+    if (gen && this.textures.exists(gen)) return gen
+    const id = this.bodyChildId ?? 'theodore'
+    return `explorer-${id}${pose === 'idle' ? '' : `-${pose}`}`
+  }
+
+  private ensureAvatar(id: ChildId, look: AvatarLook) {
+    const k = `${id}:${lookKey(look)}`
+    if (this.lastLookKey === k) return
+    this.lastLookKey = k
+    registerLookTextures(this, `av-${id}-${lookKey(look)}`, look, (keys) => {
+      if (!this.sys?.displayList) return
+      if (this.bodyChildId === id) {
+        this.avatarKeys = keys
+        this.avatarKeysChild = id
+      }
+      // re-skin the visible body if the room still shows this child
+      if (this.bodyChildId === id && this.bodyImage?.scene) {
+        this.bodyImage.setTexture(this.texKey('idle'))
+      }
+    })
+  }
 
   constructor() {
     super('RoomScene')
@@ -131,11 +164,10 @@ export class RoomScene extends Phaser.Scene {
       loop: true,
       callback: () => {
         const body = this.bodyImage
-        const id = this.bodyChildId
-        if (!body || !id) return
-        body.setTexture(`explorer-${id}-blink`)
+        if (!body || !this.bodyChildId) return
+        body.setTexture(this.texKey('blink'))
         this.time.delayedCall(140, () => {
-          if (body.scene) body.setTexture(`explorer-${id}`)
+          if (body.scene) body.setTexture(this.texKey('idle'))
         })
       },
     })
@@ -176,7 +208,9 @@ export class RoomScene extends Phaser.Scene {
     })
     this.charGroup.setSize(140, EXPLORER_HEIGHT)
     this.charGroup.setInteractive({ useHandCursor: true })
-    this.charGroup.on('pointerdown', () => this.hop())
+    this.charGroup.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (tapOnCanvas(pointer)) this.hop()
+    })
   }
 
   private hop() {
@@ -202,7 +236,8 @@ export class RoomScene extends Phaser.Scene {
     if (layout.origin === 'bottom') img.setOrigin(0.5, 1)
     img.setDepth(SPOT_DEPTH[spot])
     img.setInteractive({ useHandCursor: true })
-    img.on('pointerdown', () => {
+    img.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (!tapOnCanvas(pointer)) return
       // little "boop" bounce then tell React which spot was tapped
       this.tweens.add({
         targets: img,
@@ -231,6 +266,12 @@ export class RoomScene extends Phaser.Scene {
   private applyState(payload: RoomStatePayload) {
     if (!this.sys.displayList) return // scene is gone (destroy called)
     const def = CHILDREN[payload.childId]
+    if (payload.look) this.ensureAvatar(payload.childId, payload.look)
+    // if we're showing a different child now, drop the old look's keys
+    if (this.avatarKeysChild !== payload.childId) {
+      this.avatarKeys = {}
+      this.avatarKeysChild = payload.childId
+    }
 
     // per-child room tint
     const bgKey = payload.childId === 'leonard' ? 'room-bg-leonard' : 'room-bg'
@@ -245,13 +286,13 @@ export class RoomScene extends Phaser.Scene {
 
     // rebuild body (cheap enough to redo on every state push)
     this.bobber.removeAll(true)
+    this.bodyChildId = payload.childId
     const body = this.add
-      .image(0, 0, def.explorerKey)
+      .image(0, 0, this.texKey('idle'))
       .setOrigin(0.5, 1)
       .setDisplaySize((EXPLORER_HEIGHT * 200) / 240, EXPLORER_HEIGHT)
     this.bobber.add(body)
     this.bodyImage = body
-    this.bodyChildId = payload.childId
 
     if (payload.hat) {
       const item = itemById(payload.hat)
@@ -274,7 +315,9 @@ export class RoomScene extends Phaser.Scene {
       // so the wheels ride exactly on the track ellipse
       this.train.setOrigin(0.5, 0.94)
       this.train.setInteractive({ useHandCursor: true })
-      this.train.on('pointerdown', () => this.setTrainRunning(!this.trainRunning))
+      this.train.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        if (tapOnCanvas(pointer)) this.setTrainRunning(!this.trainRunning)
+      })
       this.placeTrain()
     } else if (!showTrain && this.train) {
       this.train.destroy()

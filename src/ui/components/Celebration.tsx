@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import type { ChildId } from '../../domain/types'
 import { assetUrl } from '../../game/assets'
+import { explorerDataUrl } from '../../game/avatarSvg'
+import { useGameState } from '../../storage/hooks'
 
 export interface CelebrationData {
   coins: number
@@ -21,6 +23,7 @@ export function Celebration({
   data: CelebrationData
   onDone: () => void
 }) {
+  const state = useGameState()
   useEffect(() => {
     const t = setTimeout(onDone, 3200)
     return () => clearTimeout(t)
@@ -31,7 +34,7 @@ export function Celebration({
       <div className="celebration-card">
         <img
           className="celebration-cheer"
-          src={assetUrl(`explorer-${childId}-cheer`)}
+          src={explorerDataUrl(state.children[childId].look, 'cheer')}
           alt=""
           aria-hidden="true"
         />

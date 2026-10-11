@@ -51,7 +51,7 @@ test('city loop: two claims → approvals → kits → road opens → library cu
   await expect(rows).toHaveCount(2)
   await rows.first().getByRole('button', { name: 'Approve' }).click()
   await rows.first().getByRole('button', { name: 'Approve' }).click()
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
 
   // Theodore buys a kit → confirm sheet → Road: 1 of 2
   await pickExplorer(page, 'Theodore')

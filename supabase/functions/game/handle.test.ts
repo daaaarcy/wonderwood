@@ -291,7 +291,7 @@ describe('v5: grown-up commands + migration on load', () => {
     expect((claim.json as { result: { ok: boolean } }).result.ok).toBe(true)
     // the persisted doc is migrated to the latest schema
     const stored = store.households.get(hid)!.state
-    expect(stored.schemaVersion).toBe(8)
+    expect(stored.schemaVersion).toBe(9)
     expect(stored.scheduleHistory.length).toBeGreaterThan(0)
   })
 })

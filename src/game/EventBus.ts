@@ -7,6 +7,17 @@ import Phaser from 'phaser'
  */
 export const EventBus = new Phaser.Events.EventEmitter()
 
+/**
+ * Phaser listens at window level, so a tap that lands on a DOM overlay —
+ * the fixed nav, a button floating over the canvas, a sticky tag — still
+ * reaches interactive scene objects. Only honor taps whose actual DOM target
+ * is the canvas (the window-level test hooks emit without a pointer).
+ */
+export function tapOnCanvas(pointer: Phaser.Input.Pointer): boolean {
+  const el = pointer.downElement as Element | null | undefined
+  return !(el instanceof Element) || el instanceof HTMLCanvasElement
+}
+
 // Test hooks: let e2e specs drive scene taps deterministically.
 if (typeof window !== 'undefined') {
   ;(window as unknown as { __townTap?: (projectId: string) => void }).__townTap = (projectId) =>

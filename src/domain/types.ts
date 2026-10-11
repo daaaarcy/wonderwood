@@ -1,3 +1,5 @@
+import type { AvatarLook } from './avatar.ts'
+
 export type ChildId = 'theodore' | 'leonard'
 
 export const CHILD_IDS: ChildId[] = ['theodore', 'leonard']
@@ -99,6 +101,9 @@ export interface ChildState {
   placed: Partial<Record<FurnitureSpot, string>>
   wishItem: string | null
   league: LeagueState
+  /** v9: the explorer's look — face, hair, outfit. Free to change, no effect
+   *  on coins, stars, league or city. */
+  look: AvatarLook
 }
 
 /* ---------------- Town / city ---------------- */
@@ -208,7 +213,7 @@ export interface CustomQuest {
 }
 
 export interface GameState {
-  schemaVersion: 8
+  schemaVersion: 9
   /** Grown-up-editable per-child settings. */
   config: Record<ChildId, ChildConfig>
   /** Schedule history — a day uses the latest entry with effectiveFrom ≤ day. */
@@ -304,6 +309,7 @@ export type Command =
       id: string
       patch: Partial<Pick<CustomQuest, 'title' | 'coins' | 'stars' | 'childIds' | 'days' | 'active'>>
     }
+  | { type: 'setLook'; childId: ChildId; look: AvatarLook }
 
 export type DomainErrorCode =
   | 'already-claimed-today'
@@ -328,6 +334,7 @@ export type DomainErrorCode =
   | 'unknown-incident'
   | 'incident-not-repaired'
   | 'invalid-quest'
+  | 'invalid-look'
 
 export interface DomainError {
   code: DomainErrorCode

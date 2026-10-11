@@ -22,7 +22,13 @@ const SPOT_NAMES: Record<FurnitureSpot, string> = {
   'decor-b': 'Wall spot 2',
 }
 
-export function RoomScreen({ childId }: { childId: ChildId }) {
+export function RoomScreen({
+  childId,
+  onEditLook,
+}: {
+  childId: ChildId
+  onEditLook?: () => void
+}) {
   const state = useGameState()
   const repo = useRepository()
   const child = state.children[childId]
@@ -59,8 +65,9 @@ export function RoomScreen({ childId }: { childId: ChildId }) {
       hat: child.equipped.hat,
       toy: child.equipped.toy,
       placed: child.placed,
+      look: child.look,
     })
-  }, [state, sceneReady, childId, child.equipped.hat, child.equipped.toy, child.placed])
+  }, [state, sceneReady, childId, child.equipped.hat, child.equipped.toy, child.placed, child.look])
 
   const ownsHat = child.inventory.includes('hat-leaf')
   const hatOn = child.equipped.hat === 'hat-leaf'
@@ -96,12 +103,17 @@ export function RoomScreen({ childId }: { childId: ChildId }) {
         </p>
       ))}
 
-      <button
-        className="btn btn-neutral album-btn"
-        onClick={() => setAlbum(true)}
-      >
-        My postcard album {(state.city.postcards ?? []).length > 0 ? `(${(state.city.postcards ?? []).length})` : ''}
-      </button>
+      <div className="room-buttons">
+        <button className="btn btn-neutral" onClick={onEditLook}>
+          Change my look
+        </button>
+        <button
+          className="btn btn-neutral album-btn"
+          onClick={() => setAlbum(true)}
+        >
+          My postcard album {(state.city.postcards ?? []).length > 0 ? `(${(state.city.postcards ?? []).length})` : ''}
+        </button>
+      </div>
       {album && (
         <div className="sheet-backdrop" onClick={() => setAlbum(false)}>
           <div className="sheet album-sheet" role="dialog" aria-label="Postcard album" onClick={(e) => e.stopPropagation()}>

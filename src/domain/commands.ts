@@ -1,5 +1,7 @@
 import { addDaysKey, localDateKey, mondayKeyOf, weekdayOf } from './week.ts'
 import { scheduleForDate } from './migrate.ts'
+import { isValidLook } from './avatar.ts'
+import type { AvatarLook } from './avatar.ts'
 import type {
   ChildId,
   Claim,
@@ -1333,6 +1335,24 @@ export function setSound(
   return { state: next, result: ok(next) }
 }
 
+export function setLook(
+  state: GameState,
+  cmd: { childId: ChildId; look: AvatarLook },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<GameState> {
+  void now
+  void deps
+  if (!isValidLook(cmd.look)) return { state, result: err('invalid-look', 'That look isn’t allowed.') }
+  const child = state.children[cmd.childId]
+  if (!child) return { state, result: err('invalid-config', 'Unknown explorer.') }
+  const next: GameState = {
+    ...state,
+    children: { ...state.children, [cmd.childId]: { ...child, look: cmd.look } },
+  }
+  return { state: next, result: ok(next) }
+}
+
 export function applyCommand(
   state: GameState,
   cmd: Command,
@@ -1392,6 +1412,8 @@ export function applyCommand(
       return createCustomQuest(state, cmd, now, deps)
     case 'updateCustomQuest':
       return updateCustomQuest(state, cmd, now, deps)
+    case 'setLook':
+      return setLook(state, cmd, now, deps)
     default: {
       const _exhaustive: never = cmd
       void _exhaustive

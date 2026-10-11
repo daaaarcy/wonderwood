@@ -198,7 +198,7 @@ test('weekly challenge card: progress + completion awards +20', async ({ page })
     for (const d of '1234') await page.getByRole('button', { name: `Digit ${d}` }).click()
   }
   await page.locator('.pending-panel .claim-row').first().getByRole('button', { name: 'Approve' }).click()
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
   await page.getByRole('button', { name: 'Leonard' }).click()
   await expect(page.getByTestId('coin-count')).toHaveText('50') // 20 + 10 + 20 weekly
 })
@@ -212,13 +212,14 @@ test('reset & repair: grown-up logs → repaired → only that child sees thanks
   if (await confirm.isVisible().catch(() => false)) {
     for (const d of '1234') await page.getByRole('button', { name: `Digit ${d}` }).click()
   }
+  await page.getByRole('button', { name: 'Repair' }).click()
   const panel = page.locator('.repairs-panel')
   await panel.getByRole('button', { name: 'Leonard' }).click()
   await panel.getByLabel('Situation').selectOption('spitting')
   await expect(page.getByTestId('repair-suggestion')).toContainText('clean the spot')
   await panel.getByRole('button', { name: 'Write it down' }).click()
   await panel.getByRole('button', { name: 'Repaired' }).click()
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
   // Leonard sees the thank-you card
   await pickExplorer(page, 'Leonard')
   await expect(page.getByTestId('repair-ack')).toContainText('Thanks for making it right, Leonard!')

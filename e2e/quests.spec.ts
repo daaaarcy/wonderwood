@@ -51,7 +51,7 @@ test('Leonard reading flow: books & chapters → correct rewards + journal', asy
       .getByRole('button', { name: 'Approve' }).click()
     await expect(page.locator('.pending-panel .claim-row')).toHaveCount(3 - i - 1)
   }
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
   await pickExplorer(page, 'Leonard')
   await dismissCelebration(page)
   await expect(page.getByTestId('coin-count')).toHaveText('40') // 20 + 10 + 5 + 5
@@ -69,7 +69,7 @@ test('Leonard reading flow: books & chapters → correct rewards + journal', asy
   await switchExplorer(page)
   await enterGrownups(page)
   await page.locator('.pending-panel .claim-row').getByRole('button', { name: 'Approve' }).click()
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
   await pickExplorer(page, 'Leonard')
   await expect(page.getByTestId('coin-count')).toHaveText('40')
 })
@@ -130,7 +130,7 @@ test('math challenge: wrong → try again → right, then send for bonus coins',
   const row = page.locator('.pending-panel .claim-row', { hasText: "Builders' math" })
   await expect(row).toBeVisible()
   await row.getByRole('button', { name: 'Approve' }).click()
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
   await pickExplorer(page, 'Theodore')
   await dismissCelebration(page)
   await expect(page.getByTestId('coin-count')).toHaveText('25') // 20 + 5 bonus
@@ -158,7 +158,7 @@ test('bonus slots cap: third bonus claim approved → 0 coins + full message', a
     await page.locator('.pending-panel .claim-row').first()
       .getByRole('button', { name: 'Approve' }).click()
   }
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
   await pickExplorer(page, 'Theodore')
   await dismissCelebration(page)
   await expect(page.getByTestId('coin-count')).toHaveText('30') // 20 + 5 + 5 + 0
@@ -170,12 +170,12 @@ test('grown-up pauses today → child sees a rest day', async ({ page }) => {
   await pickExplorer(page, 'Theodore')
   await switchExplorer(page)
   await enterGrownups(page)
-  const panel = page.locator('.panel', { hasText: 'Theodore’s quests' })
-  await panel.locator('summary').click()
+  await page.getByRole('button', { name: 'Schedule' }).click()
+  const panel = page.locator('.panel[aria-label="Schedule"]')
   await panel.locator('label.sched-check', { hasText: 'Today is a rest day' }).click()
   await panel.getByRole('button', { name: 'Save schedule & settings' }).click()
   await expect(panel.getByRole('button', { name: 'Saved ✓' })).toBeVisible()
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
   await pickExplorer(page, 'Theodore')
   await expect(page.getByText('Rest day — enjoy!')).toBeVisible()
 })

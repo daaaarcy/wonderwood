@@ -62,7 +62,7 @@ test('capture the Stage 1 screens', async ({ page }, testInfo) => {
   await expect(page.getByText('Waiting for you')).toBeVisible()
   await shot(page, p, '03-grownups')
 
-  await page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
   await page.getByRole('button', { name: 'Theodore' }).click()
   await expect(page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
 
@@ -311,15 +311,16 @@ test('capture the quest v5 screens', async ({ browser }, testInfo) => {
   await expect(l.page.locator('.pending-panel .claim-row').first()).toBeVisible()
   await shot(l.page, p, '36-approvals-details')
 
-  const panel = l.page.locator('.panel', { hasText: 'Leonard’s quests' })
-  await panel.locator('summary').click()
+  await l.page.getByRole('button', { name: 'Schedule' }).click()
+  await l.page.getByRole('tab', { name: 'Leonard' }).click()
+  const panel = l.page.locator('.panel[aria-label="Schedule"]')
   await expect(panel.locator('.quest-day-rows')).toBeVisible()
   await shot(l.page, p, '37-schedule-editor')
 
   // pause today → rest day card
   await panel.locator('label.sched-check', { hasText: 'Today is a rest day' }).click()
   await panel.getByRole('button', { name: 'Save schedule & settings' }).click()
-  await l.page.getByRole('button', { name: 'Done — back to explorers' }).click()
+  await l.page.getByRole('button', { name: 'Back to explorers' }).click()
   await l.page.getByRole('button', { name: 'Leonard' }).click()
   await expect(l.page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
   await l.page.waitForTimeout(600)
@@ -462,10 +463,14 @@ test('capture the v6 screens', async ({ browser }, testInfo) => {
     if (await conf.isVisible().catch(() => false)) {
       for (const d of '1234') await s.page.getByRole('button', { name: `Digit ${d}` }).click()
     }
-    const panel = s.page.locator('.panel', { hasText: 'Leonard’s quests' })
-    await panel.locator('summary').click()
-    await s.page.locator('.repairs-panel').scrollIntoViewIfNeeded()
-    await shot(s.page, p, '49-grownups-schedule-repairs')
+    await s.page.getByRole('button', { name: 'Schedule' }).click()
+    await s.page.getByRole('tab', { name: 'Leonard' }).click()
+    const schedPanel = s.page.locator('.panel[aria-label="Schedule"]')
+    await expect(schedPanel.locator('.quest-day-rows')).toBeVisible()
+    await shot(s.page, p, '49-grownups-schedule')
+    await s.page.getByRole('button', { name: 'Repair' }).click()
+    await expect(s.page.locator('.repairs-panel')).toBeVisible()
+    await shot(s.page, p, '49b-grownups-repair')
     await s.context.close()
   }
 })
@@ -594,7 +599,8 @@ test('capture the v7 screens', async ({ browser }, testInfo) => {
     if (await conf.isVisible().catch(() => false)) {
       for (const d of '1234') await s.page.getByRole('button', { name: `Digit ${d}` }).click()
     }
-    await s.page.locator('.tasks-panel').scrollIntoViewIfNeeded()
+    await s.page.getByRole('button', { name: 'Tasks' }).click()
+    await expect(s.page.locator('.tasks-panel')).toBeVisible()
     await shot(s.page, p, '55-grownups-tasks')
     await s.page.locator('.tasks-panel').getByTestId('add-task').click()
     await s.page.waitForTimeout(300)

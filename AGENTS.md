@@ -24,7 +24,7 @@ E2E runs against `npm run preview` on port 4173 — build first (the script does
 ```
 src/
   domain/     Pure TypeScript. NO React/Phaser/DOM imports. Fully unit tested.
-    types.ts      GameState (schemaVersion 7), Command union, Result/error types
+    types.ts      GameState (schemaVersion 9), Command union, Result/error types
     week.ts       local Mon–Sun week math (weekKey = ISO Monday)
     commands.ts   includes Explorer League evaluation (evaluateLeagues)
 
@@ -93,6 +93,13 @@ e2e/          Playwright specs. screenshots/ output is gitignored.
   the configured reward, never consumes bonus slots; starred custom approvals
   count toward the league like core. `create/updateCustomQuest` are PIN-gated
   (GROWN_UP_COMMANDS); `placeItem` is a child command.
+- **Avatar looks (v9)**: `ChildState.look` — free face/hair/outfit
+  customization (`setLook` is child-allowed; never touches coins/stars/
+  league/city). `src/game/avatarSvg.ts` draws the 200×240 explorer SVG at
+  runtime; head geometry is fixed so hat `headAnchor`s keep working. Phaser
+  scenes register generated textures as `av-<child>-<lookKey>-<pose>` and
+  re-texture on state pushes; the static explorer SVGs in public/assets are
+  the pre-load fallback.
 - **Touch targets** ≥ 56px for primary buttons; `prefers-reduced-motion` swaps
   the celebration animation for a static highlight.
 
@@ -106,7 +113,7 @@ e2e/          Playwright specs. screenshots/ output is gitignored.
   `anchor` fraction in the catalogue.
 - `localStorage` between e2e runs is per-test-context; tests are independent.
 
-## Supabase backend (schema v7)
+## Supabase backend (schema v9)
 
 Authoritative state lives in Postgres (`households.state`, versioned). All writes
 go through edge function `game` (`supabase/functions/game/`), which runs the same

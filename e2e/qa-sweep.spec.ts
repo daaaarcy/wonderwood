@@ -388,6 +388,10 @@ test('QA: child home states', async ({ browser }, testInfo) => {
         await page.waitForTimeout(150)
       }
       await shot(page, dev, 'home-bonus-open')
+      // nav must stay pinned even scrolled to the bottom
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+      await page.waitForTimeout(200)
+      await shot(page, dev, 'home-scrolled-nav')
       await context.close()
     }
     // pending claims — waiting cards
@@ -708,37 +712,39 @@ test('QA: grown-ups', async ({ browser }, testInfo) => {
       await expect(page.locator('.pending-panel .claim-row').first()).toBeVisible()
       await shot(page, dev, 'grownups-approvals')
 
+      await page.getByRole('button', { name: 'Settings' }).click()
       const devicesPanel = page.locator('.panel[aria-label="Devices"]')
-      await devicesPanel.scrollIntoViewIfNeeded()
       await expect(devicesPanel.locator('.claim-row').first()).toBeVisible()
       await devicesPanel.getByRole('button', { name: 'Add a device' }).click()
       await expect(page.locator('.pairing-digits')).toBeVisible()
       await shot(page, dev, 'grownups-devices')
 
+      await page.getByRole('button', { name: 'Repair' }).click()
       const repairs = page.locator('.repairs-panel')
-      await repairs.scrollIntoViewIfNeeded()
       await repairs.locator('select.form-input').selectOption('other')
       await expect(repairs.getByTestId('repair-suggestion')).toBeVisible()
       await repairs.getByPlaceholder('A few words…').fill('grabbed the toy')
       await shot(page, dev, 'grownups-repair')
 
+      await page.getByRole('button', { name: 'Tasks' }).click()
       const tasks = page.locator('.tasks-panel')
       await tasks.getByTestId('add-task').click()
       await expect(tasks.getByTestId('task-save')).toBeVisible()
       await shot(page, dev, 'grownups-task-form')
       await context.close()
     }
-    // schedule editor fully open (both children)
+    // schedule editor — segmented child picker (both children)
     {
       const { context, page } = await qaPage(browser, dev, seedJson(furnishedSeed()), { pin: PIN1234 })
       await page.goto('/')
       await unlockGrownups(page)
-      for (const child of ['Theodore', 'Leonard']) {
-        const panel = page.locator('.panel', { hasText: `${child}’s quests` })
-        await panel.locator('summary').click()
-        await expect(panel.locator('.quest-day-rows')).toBeVisible()
-      }
-      await shot(page, dev, 'grownups-schedule')
+      await page.getByRole('button', { name: 'Schedule' }).click()
+      const panel = page.locator('.panel[aria-label="Schedule"]')
+      await expect(panel.locator('.quest-day-rows')).toBeVisible()
+      await shot(page, dev, 'grownups-schedule-theodore')
+      await page.getByRole('tab', { name: 'Leonard' }).click()
+      await expect(panel.locator('.quest-day-rows')).toBeVisible()
+      await shot(page, dev, 'grownups-schedule-leonard')
       await context.close()
     }
     // next-building chooser
@@ -748,9 +754,17 @@ test('QA: grown-ups', async ({ browser }, testInfo) => {
       await page.goto('/')
       await unlockGrownups(page)
       const nb = page.locator('.next-building')
-      await nb.scrollIntoViewIfNeeded()
       await expect(nb.locator('.claim-row').first()).toBeVisible()
       await shot(page, dev, 'grownups-next-building')
+      await context.close()
+    }
+    // done quest rows — the little star tag must stay small
+    {
+      const { context, page } = await qaPage(browser, dev, seedJson(doneSeed()), { pin: PIN1234 })
+      await page.goto('/')
+      await unlockGrownups(page)
+      await expect(page.locator('.tag-done').first()).toBeVisible()
+      await shot(page, dev, 'grownups-done-star')
       await context.close()
     }
   }
@@ -951,6 +965,77 @@ test('QA: promotion overlay', async ({ browser }, testInfo) => {
       await page.getByRole('button', { name: 'Theodore' }).click()
       await expect(page.getByRole('dialog')).toBeVisible()
       await shotOverlay(page, dev, 'promotion-reduced')
+      await context.close()
+    }
+  }
+})
+
+test('QA: avatar editor + custom look scenes', async ({ browser }, testInfo) => {
+  onlyOnce(testInfo.project.name)
+  const custom = () =>
+    freshState((s) => {
+      s.children.theodore.look = {
+        skin: '#d39a6a',
+        hair: 'mohawk',
+        hairColor: '#8e6fd1',
+        eyes: 'sparkle',
+        mouth: 'grin',
+        glasses: 'round',
+        shirt: '#58cc02',
+        scarf: '#ffc800',
+      }
+      s.children.leonard.look = {
+        skin: '#ffe0c4',
+        hair: 'long',
+        hairColor: '#e8b64c',
+        eyes: 'happy',
+        mouth: 'smile',
+        glasses: 'shades',
+        shirt: '#ff4b4b',
+        scarf: '#2b70c9',
+      }
+    })
+  for (const dev of DEVICE_NAMES) {
+    // editor — skin + hair categories
+    {
+      const { context, page } = await qaPage(browser, dev, seedJson(freshState()))
+      await openHome(page)
+      await page.getByLabel('Explorer menu').click()
+      await page.getByRole('menuitem', { name: 'Change my look' }).click()
+      await expect(page.getByTestId('avatar-editor')).toBeVisible()
+      await shot(page, dev, 'avatar-skin')
+      await page.getByRole('tab', { name: 'Hair', exact: true }).click()
+      await shot(page, dev, 'avatar-hair')
+      await page.getByRole('tab', { name: 'Glasses' }).click()
+      await shot(page, dev, 'avatar-glasses')
+      await context.close()
+    }
+    // customized explorers in the world: town, room, celebration
+    {
+      const { context, page } = await qaPage(browser, dev, seedJson(custom()))
+      await openHome(page)
+      await page.waitForTimeout(800) // let generated textures land
+      await shot(page, dev, 'avatar-town')
+      await page.locator('.main-nav').getByRole('button', { name: 'My room' }).click()
+      await expect(page.locator('[data-scene="room"][data-scene-ready="true"]')).toBeAttached()
+      await page.waitForTimeout(600)
+      await shot(page, dev, 'avatar-room')
+      await context.close()
+    }
+    // opening-day celebration — both explorers cheering with custom looks
+    {
+      const s = custom()
+      s.city.projects.road = { kits: 1, status: 'building' }
+      s.city.currentProjectId = 'road'
+      s.city.suggestedProjectId = 'library'
+      s.city.name = 'Sunny Town'
+      const { context, page } = await qaPage(browser, dev, seedJson(s))
+      await openHome(page)
+      await page.getByRole('button', { name: 'Add a kit' }).click()
+      await page.getByRole('button', { name: 'Yes, add it!' }).click()
+      await expect(page.getByRole('dialog', { name: 'A building opened!' })).toBeVisible()
+      await page.waitForTimeout(500)
+      await shotOverlay(page, dev, 'avatar-celebration')
       await context.close()
     }
   }

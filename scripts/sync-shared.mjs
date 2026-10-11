@@ -9,6 +9,7 @@ import { join } from 'node:path'
 
 const FILES = [
   'types.ts',
+  'avatar.ts',
   'state.ts',
   'week.ts',
   'migrate.ts',
@@ -19,7 +20,7 @@ const FILES = [
   'catalogue.ts',
   'city.ts',
 ]
-const SRC = { 'types.ts': 'src/domain', 'state.ts': 'src/domain', 'week.ts': 'src/domain', 'commands.ts': 'src/domain', 'migrate.ts': 'src/domain', 'challenge.ts': 'src/domain', 'weekly.ts': 'src/data',
+const SRC = { 'types.ts': 'src/domain', 'avatar.ts': 'src/domain', 'state.ts': 'src/domain', 'week.ts': 'src/domain', 'commands.ts': 'src/domain', 'migrate.ts': 'src/domain', 'challenge.ts': 'src/domain', 'weekly.ts': 'src/data',
               'quests.ts': 'src/data', 'catalogue.ts': 'src/data', 'city.ts': 'src/data' }
 const OUT = 'supabase/functions/_shared'
 
