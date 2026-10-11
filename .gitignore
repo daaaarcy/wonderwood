@@ -9,3 +9,4 @@ test-results/
 
 # synced copies of src/domain + src/data for Deno bundling
 supabase/functions/_shared/
+.serena/

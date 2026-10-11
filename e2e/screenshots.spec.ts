@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type Page } from '@playwright/test'
 import { mkdirSync } from 'node:fs'
-import { citySeed, leagueSeed, promotionSeed, seedJson, v2SeedJson, freshState } from './seed'
+import { boardSeed, citySeed, leagueSeed, promotionSeed, seedJson, v2SeedJson, freshState } from './seed'
 
 const DIR = 'screenshots'
 const CAPTURE = ['phone-chromium', 'tablet-chromium']
@@ -162,6 +162,21 @@ test('league screen at ranks 1 / 7 / 14', async ({ browser }, testInfo) => {
     await shot(page, p, `07-league-r${rank}`)
     await context.close()
   }
+})
+
+test('league screen: weekly leaderboard with storybook friends', async ({ browser }, testInfo) => {
+  captureOnly(testInfo.project.name)
+  mkdirSync(DIR, { recursive: true })
+  const p = testInfo.project.name
+  const { context, page } = await seededPage(browser, p, seedJson(boardSeed()))
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Theodore' }).click()
+  await expect(page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
+  await page.getByRole('button', { name: 'League', exact: true }).click()
+  await expect(page.locator('.board-row')).toHaveCount(10) // this week + last week
+  await page.locator('.league-how summary').click() // open the explainer for the shot
+  await shot(page, p, '50-league-friends')
+  await context.close()
 })
 
 test('promotion overlay + badge gallery', async ({ browser }, testInfo) => {

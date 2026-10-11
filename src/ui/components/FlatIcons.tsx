@@ -155,6 +155,16 @@ export const BearIcon = ({ size = 24 }: { size?: number }) => (
   </FlatIcon>
 )
 
+export const PawIcon = ({ size = 24, color = '#96683f' }: { size?: number; color?: string }) => (
+  <FlatIcon size={size}>
+    <ellipse cx="24" cy="31" rx="9.5" ry="7.5" fill={color} />
+    <circle cx="10.5" cy="21" r="4.2" fill={color} />
+    <circle cx="18" cy="14.5" r="4.2" fill={color} />
+    <circle cx="30" cy="14.5" r="4.2" fill={color} />
+    <circle cx="37.5" cy="21" r="4.2" fill={color} />
+  </FlatIcon>
+)
+
 export const PatrolCarIcon = ({ size = 24 }: { size?: number }) => (
   <FlatIcon size={size}>
     <rect x="6" y="18" width="36" height="16" rx="8" fill="#ffffff" />

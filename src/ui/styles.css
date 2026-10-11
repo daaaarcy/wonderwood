@@ -895,6 +895,10 @@ button {
   vertical-align: middle;
   margin-left: 8px;
 }
+.league-rule-note {
+  margin: -4px 0 10px;
+  font-size: 0.82rem;
+}
 
 /* ---------- shop ---------- */
 
@@ -1081,6 +1085,160 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* how leagues work — expandable explainer */
+.league-how summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 900;
+  font-size: 1.05rem;
+  color: var(--blue-lip);
+  padding: 4px 2px;
+}
+.league-how summary::-webkit-details-marker {
+  display: none;
+}
+.league-how .how-caret::after {
+  content: '▸';
+  font-size: 0.9rem;
+}
+.league-how[open] .how-caret::after {
+  content: '▾';
+}
+.league-how-icons {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.league-how-icons .league-how-icon {
+  width: 30px;
+  height: 30px;
+  box-shadow: 0 2px 0 var(--green-lip);
+}
+.league-how-icons .league-how-icon img {
+  width: 18px;
+  height: 18px;
+}
+.league-rules {
+  margin: 10px 0 6px;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.league-rules li {
+  font-weight: 700;
+  line-height: 1.45;
+}
+.league-how-note {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+}
+
+/* weekly leaderboard — family + storybook friends in one sorted list */
+.board-card h3 {
+  margin-bottom: 12px;
+}
+.board-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  background: var(--white);
+}
+.board-row.board-friend {
+  background: #fff8ec;
+}
+.board-row.board-me {
+  border-color: var(--blue);
+  background: #eaf7fe;
+}
+.board-pos {
+  width: 2.4ch;
+  flex: none;
+  text-align: right;
+  font-weight: 900;
+  color: var(--text-soft);
+}
+.board-avatar {
+  width: 46px;
+  height: 38px;
+  flex: none;
+  object-fit: contain;
+}
+.board-row .avatar-crop {
+  flex: none;
+}
+.board-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-weight: 900;
+}
+.tag-friend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 2px 6px;
+  border-radius: 10px;
+  border: 1.5px solid #ecc9a0;
+  background: #fff3e4;
+  color: #96683f;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.board-score {
+  margin-left: auto;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+  text-align: right;
+}
+.board-score b {
+  font-size: 0.9rem;
+}
+.board-score .muted {
+  font-size: 0.8rem;
+}
+.board-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+}
+.board-cheer {
+  margin: 8px 0 0;
+  text-align: center;
+  font-weight: 900;
+  color: var(--green-lip);
+}
+.board-last .board-row {
+  padding: 4px 10px;
+}
+.board-last .board-avatar {
+  width: 38px;
+  height: 32px;
 }
 
 .badge-gallery {

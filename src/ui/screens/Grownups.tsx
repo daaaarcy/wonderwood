@@ -261,6 +261,10 @@ export function Grownups({ onExit }: { onExit: () => void }) {
                 <LeagueBadge rank={league.rank} size={30} /> {leagueTitle(league.rank)}
               </span>
             </h3>
+            <p className="muted league-rule-note">
+              League rule: finish at least 70% of the week&rsquo;s quests on 3 or more days → up
+              one league on Sunday. Never moves down.
+            </p>
             {todayView.restDay ? (
               <p className="muted">Rest day today.</p>
             ) : (

@@ -1,7 +1,9 @@
 import { addDaysKey, localDateKey, mondayKeyOf, weekdayOf } from './week.ts'
 import { scheduleForDate } from './migrate.ts'
 import { projectById } from '../data/city.ts'
-import { customQuestsOn, weeklyDaysCount } from './commands.ts'
+import { CHILD_LIST } from '../data/children.ts'
+import { customQuestsOn, weekEligibility, weeklyDaysCount } from './commands.ts'
+import { NPCS, npcLeagueRank, npcWeekProgress } from './npcs.ts'
 import { DEFAULT_WEEKLY, weeklyTemplateById } from '../data/weekly.ts'
 import type { ChildId, Claim, GameState, ProjectId, RepairIncident, WeeklyBadge } from './types.ts'
 import { BONUS_SLOTS_PER_DAY } from './types.ts'
@@ -218,6 +220,104 @@ export function leagueWeekStatus(state: GameState, childId: ChildId, now: Date):
   const restWeek = days < 3
   const target = restWeek ? null : Math.ceil(0.7 * opportunities)
   return { count, activeDays, eligibleDays: days, opportunities, target, restWeek }
+}
+
+/* ---------------- weekly leaderboard (storybook friends) ---------------- */
+
+export interface WeekScore {
+  /** approved core+custom claims (starred) in the week through `throughKey` */
+  completed: number
+  /** scheduled core+custom opportunities in the week through `throughKey` */
+  opportunities: number
+  /** completed ÷ opportunities — 0 when nothing was offered */
+  pct: number
+}
+
+/**
+ * A child's score in week `weekKey`, counting only days through `throughKey`
+ * (today for the live week, the week's Sunday for a finished one). Uses the
+ * same accounting as the promotion rule: approved core/custom claims that
+ * carried a star, over scheduled opportunities (paused/pre-creation days
+ * excluded).
+ */
+export function childWeekScore(
+  state: GameState,
+  childId: ChildId,
+  weekKey: string,
+  throughKey: string,
+): WeekScore {
+  const sunday = addDaysKey(weekKey, 6)
+  const through = throughKey < sunday ? throughKey : sunday
+  const { opportunities } = weekEligibility(state, childId, weekKey, through)
+  const completed = Object.values(state.claims).filter(
+    (c) =>
+      c.childId === childId &&
+      c.status === 'approved' &&
+      c.activityDate >= weekKey &&
+      c.activityDate <= through &&
+      (c.role === 'core' || c.role === 'custom') &&
+      (c.reward?.stars ?? 1) > 0,
+  ).length
+  return { completed, opportunities, pct: opportunities > 0 ? completed / opportunities : 0 }
+}
+
+export interface LeaderboardEntry {
+  /** ChildId or NpcId. */
+  id: string
+  kind: 'child' | 'npc'
+  name: string
+  /** Animal portrait asset key (friends only). */
+  assetKey?: string
+  completed: number
+  opportunities: number
+  pct: number
+  /** Shared competition position (1-based); equal pcts share it ("1="). */
+  position: number
+  /** True when another row shares the same position. */
+  tied: boolean
+  /** Explorer League rank for the badge (friends: simulated for that week). */
+  leagueRank: number
+}
+
+/**
+ * One sorted standings table mixing the two explorers and their storybook
+ * friends for week `weekKey` through `throughKey`. Sorted by pct descending
+ * (name as a stable tie-break); equal displayed percents share a position.
+ */
+export function weeklyLeaderboard(
+  state: GameState,
+  weekKey: string,
+  throughKey: string,
+): LeaderboardEntry[] {
+  const rows: Omit<LeaderboardEntry, 'position' | 'tied'>[] = [
+    ...CHILD_LIST.map((def) => ({
+      id: def.id as string,
+      kind: 'child' as const,
+      name: def.name,
+      ...childWeekScore(state, def.id, weekKey, throughKey),
+      leagueRank: state.children[def.id].league.rank,
+    })),
+    ...NPCS.map((npc) => {
+      const p = npcWeekProgress(npc.id, weekKey, throughKey)
+      return {
+        id: npc.id as string,
+        kind: 'npc' as const,
+        name: npc.name,
+        assetKey: npc.assetKey,
+        completed: p.completed,
+        opportunities: p.opportunities,
+        pct: p.pctSoFar,
+        leagueRank: npcLeagueRank(npc.id, weekKey),
+      }
+    }),
+  ]
+  rows.sort((a, b) => b.pct - a.pct || (a.name < b.name ? -1 : 1))
+  const pctKey = (pct: number) => Math.round(pct * 100)
+  return rows.map((row, i) => {
+    const first = rows.findIndex((r) => pctKey(r.pct) === pctKey(row.pct))
+    const tied = rows.some((r, j) => j !== i && pctKey(r.pct) === pctKey(row.pct))
+    return { ...row, position: first + 1, tied }
+  })
 }
 
 /* ---------------- weekly challenge + repairs (v6) ---------------- */

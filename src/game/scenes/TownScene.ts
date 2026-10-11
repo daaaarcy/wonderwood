@@ -68,6 +68,7 @@ export class TownScene extends Phaser.Scene {
     this.load.svg('truck', 'assets/truck.svg', { width: 280, height: 180 })
     this.load.svg('resident-fox', 'assets/resident-fox.svg', { width: 120, height: 90 })
     this.load.svg('resident-rabbit', 'assets/resident-rabbit.svg', { width: 100, height: 100 })
+    this.load.svg('resident-bear', 'assets/resident-bear.svg', { width: 120, height: 100 })
     this.load.svg('star', 'assets/star.svg', { width: 96, height: 96 })
     for (const key of ['icon-road', 'icon-library', 'icon-music', 'icon-police', 'icon-hospital']) {
       this.load.svg(key, `assets/${key}.svg`, { width: 96, height: 96 })
@@ -324,13 +325,24 @@ export class TownScene extends Phaser.Scene {
           ease: 'Sine.easeInOut',
         })
       }
-      // wandering friends
+      // wandering friends — and Bramble the Bear, too sleepy to wander:
+      // he just naps by the roadside with a slow snore-breath
       this.wander(this.add.image(90, 632, 'resident-fox').setDisplaySize(88, 66), 90, 170)
       this.wander(this.add.image(880, 330, 'resident-rabbit').setDisplaySize(62, 62).setFlipX(true), 880, 700)
+      const bramble = this.add.image(605, 652, 'resident-bear').setDisplaySize(80, 67).setDepth(2)
+      this.tweens.add({
+        targets: bramble,
+        scaleY: bramble.scaleY * 1.05,
+        duration: 1400,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      })
     } else {
       // reduced motion — the friends still say hello, just standing still
       this.add.image(90, 632, 'resident-fox').setDisplaySize(88, 66)
       this.add.image(880, 330, 'resident-rabbit').setDisplaySize(62, 62)
+      this.add.image(605, 652, 'resident-bear').setDisplaySize(80, 67).setDepth(2)
     }
   }
 

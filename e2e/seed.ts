@@ -1,7 +1,7 @@
 import { applyCommand } from '../src/domain/commands'
 import { initialState } from '../src/domain/state'
 import { addDaysKey, localDateKey, mondayKeyOf } from '../src/domain/week'
-import type { GameState, ProjectId } from '../src/domain/types'
+import type { ChildId, GameState, ProjectId } from '../src/domain/types'
 import { commandDeps } from '../src/data/registry'
 import { DEFAULT_SCHEDULE } from '../src/data/quests'
 
@@ -47,6 +47,44 @@ export function leagueSeed(rank: number): GameState {
     const lastMonday = addDaysKey(mondayKeyOf(localDateKey(new Date(), 'UTC')), -7)
     s.createdAt = `${lastMonday}T09:00:00Z`
   })
+}
+
+/**
+ * A save with a few approved quests this week AND last week, so the weekly
+ * leaderboard has kid numbers on both cards (createdAt = last Monday, so
+ * this week is fully eligible; last week never qualifies for promotion).
+ */
+export function boardSeed(): GameState {
+  const now = new Date()
+  const monday = mondayKeyOf(localDateKey(now, 'UTC'))
+  const lastMonday = addDaysKey(monday, -7)
+  let s = initialState(new Date(`${lastMonday}T09:00:00Z`), 'UTC')
+  const weeks: [string, [ChildId, string, string][]][] = [
+    [
+      lastMonday,
+      [
+        ['theodore', 'spanish', 'lw-t1'],
+        ['theodore', 'typing', 'lw-t2'],
+        ['leonard', 'reading', 'lw-l1'],
+      ],
+    ],
+    [
+      monday,
+      [
+        ['theodore', 'spanish', 'bw-t1'],
+        ['theodore', 'typing', 'bw-t2'],
+        ['leonard', 'violin', 'bw-l1'],
+      ],
+    ],
+  ]
+  for (const [weekMonday, claims] of weeks) {
+    const day = new Date(`${weekMonday}T10:00:00Z`)
+    for (const [childId, questId, claimId] of claims) {
+      s = applyCommand(s, { type: 'claimQuest', childId, questId, claimId }, day, commandDeps).state
+      s = applyCommand(s, { type: 'approveClaim', claimId }, day, commandDeps).state
+    }
+  }
+  return s
 }
 
 /** State with a project at a given kit count (status derived). */
