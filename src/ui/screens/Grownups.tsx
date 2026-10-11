@@ -175,7 +175,7 @@ export function Grownups({ onExit }: { onExit: () => void }) {
           )}
         </div>
         <button className="btn btn-ghost" onClick={onExit}>
-          Back to the explorers
+          Back to explorers
         </button>
       </div>
     )

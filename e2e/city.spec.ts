@@ -74,9 +74,9 @@ test('city loop: two claims → approvals → kits → road opens → library cu
   await expect(page.getByTestId('project-library')).toHaveText('Library: 0 of 6 kits')
   await expect(page.getByText('Our Library')).toBeVisible()
 
-  // reload → everything persists
+  // reload → everything persists, incl. the chosen explorer (Leonard's home)
   await page.reload()
-  await pickExplorer(page, 'Leonard')
+  await expect(page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
   await expect(page.getByTestId('project-road')).toHaveText('Road: open')
   await expect(page.getByTestId('project-library')).toHaveText('Library: 0 of 6 kits')
   await expect(page.getByTestId('coin-count')).toHaveText('20')

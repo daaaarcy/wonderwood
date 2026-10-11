@@ -106,6 +106,12 @@ test('math challenge: wrong → try again → right, then send for bonus coins',
       for (const n of texts.map(Number).sort((a, b) => a - b)) {
         await page.locator('.challenge-opt', { hasText: new RegExp(`^${n}$`) }).click()
       }
+    } else if (prompt?.includes('MORE')) {
+      // the piles themselves are the answers — tap the bigger one
+      const piles = page.locator('.pile-btn')
+      const pileA = await piles.first().locator('.token').count()
+      const pileB = await piles.nth(1).locator('.token').count()
+      await piles.nth(pileA > pileB ? 0 : 1).click()
     } else {
       const n = await page.locator('.challenge-opt').count()
       const before = await step.textContent()

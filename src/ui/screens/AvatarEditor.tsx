@@ -181,19 +181,21 @@ export function AvatarEditor({ childId, onDone }: { childId: ChildId; onDone: ()
       </div>
 
       <div className="look-actions">
-        <button className="btn btn-neutral" onClick={() => setDraft(randomLook())}>
-          Surprise me
-        </button>
-        <button className="btn btn-ghost" onClick={onDone}>
-          Cancel
-        </button>
         <button
-          className="btn btn-big btn-yes"
+          className="btn btn-big btn-yes look-save"
           onClick={save}
           data-testid="save-look"
         >
           Save
         </button>
+        <div className="look-actions-secondary">
+          <button className="btn btn-neutral" onClick={() => setDraft(randomLook())}>
+            Surprise me
+          </button>
+          <button className="btn btn-ghost" onClick={onDone}>
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   )

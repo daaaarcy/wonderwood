@@ -683,10 +683,10 @@ export function ChildHome({ childId }: { childId: ChildId }) {
                   (c) =>
                     c.childId === childId &&
                     c.questId === sheet.quest.id &&
-                    c.activityDate === new Date().toISOString().slice(0, 10),
+                    c.activityDate === localDateKey(new Date(), state.timeZone),
                 ).length
           }
-          today={new Date().toISOString().slice(0, 10)}
+          today={localDateKey(new Date(), state.timeZone)}
           replay={
             !today.restDay &&
             [...today.core, ...today.bonus].some(

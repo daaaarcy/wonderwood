@@ -879,25 +879,31 @@ test('QA: challenge modal', async ({ browser }, testInfo) => {
       const prompt = (await page.locator('.challenge-prompt').textContent()) ?? ''
       const opts = page.locator('.challenge-opt')
       const texts = await opts.allTextContents()
-      const m = prompt.match(/(\d+)\s*([+−-])\s*(\d+)/)
-      const piles = page.locator('.challenge-pile')
+      const piles = page.locator('.pile-btn')
       const pileA = (await piles.count()) > 0 ? await piles.first().locator('.token').count() : 0
       const pileB = (await piles.count()) > 1 ? await piles.nth(1).locator('.token').count() : 0
+      const m = prompt.match(/(\d+)\s*([+−-])\s*(\d+)\s*=\s*\?/)
+      const miss = prompt.match(/(\d+)\s*\+\s*\?\s*=\s*(\d+)/)
       let answer: number | null = null
       if (m) {
         const a = Number(m[1])
         const b = Number(m[3])
         answer = m[2] === '+' ? a + b : a - b
+      } else if (miss) {
+        answer = Number(miss[2]) - Number(miss[1])
       } else if (prompt.includes('How many')) {
-        answer = pileA
+        answer = await page.locator('.challenge-pile').first().locator('.token').count()
+      } else if (prompt.includes('boxes of')) {
+        const gm = prompt.match(/(\d+) boxes of (\d+)/)
+        answer = gm ? Number(gm[1]) * Number(gm[2]) : null
       }
       if (answer !== null) {
         // a wrong option is guaranteed among the three
         const wrongIdx = texts.findIndex((t) => Number(t) !== answer)
         if (wrongIdx >= 0) await opts.nth(wrongIdx).click()
       } else if (prompt.includes('MORE')) {
-        const right = pileA > pileB ? 'First pile' : 'Second pile'
-        await opts.filter({ hasNotText: right }).first().click()
+        // tap the SMALLER pile (the piles themselves are the answers)
+        await piles.nth(pileA > pileB ? 1 : 0).click()
       } else {
         // ordering question — pick the biggest first (wrong)
         const nums = texts.map(Number)
@@ -917,11 +923,15 @@ test('QA: challenge modal', async ({ browser }, testInfo) => {
       const piles = page.locator('.challenge-pile')
       const pileA = (await piles.count()) > 0 ? await piles.first().locator('.token').count() : 0
       const pileB = (await piles.count()) > 1 ? await piles.nth(1).locator('.token').count() : 0
+      const miss = prompt.match(/(\d+)\s*\+\s*\?\s*=\s*(\d+)/)
       if (prompt.includes('smallest to biggest')) {
         const nums = texts.map(Number)
         await opts.nth(nums.indexOf(Math.min(...nums))).click()
       } else if (prompt.includes('MORE')) {
-        await opts.filter({ hasText: pileA > pileB ? 'First pile' : 'Second pile' }).first().click()
+        await page.locator('.pile-btn').nth(pileA > pileB ? 0 : 1).click()
+      } else if (miss) {
+        const answer = Number(miss[2]) - Number(miss[1])
+        await opts.filter({ hasText: new RegExp(`^${answer}$`) }).first().click()
       } else if (m) {
         const a = Number(m[1])
         const b = Number(m[3])
@@ -944,6 +954,176 @@ test('QA: challenge modal', async ({ browser }, testInfo) => {
     await expect(page.getByText('Sent to a grown-up!')).toBeVisible()
     await shotOverlay(page, dev, 'challenge-sent')
     await context.close()
+  }
+})
+
+test('QA: challenge levels + send error', async ({ browser }, testInfo) => {
+  onlyOnce(testInfo.project.name)
+  const capDevs: Device[] = ['phone', 'tablet']
+  for (const dev of capDevs) {
+    for (const level of [1, 2, 3] as const) {
+      // try a few runIndex seeds to find a subtraction question for the picture
+      let capturedSub = false
+      for (let runIndex = 0; runIndex < 7; runIndex += 1) {
+        const state = freshState((s) => {
+          s.config.theodore.mathLevel = level
+          // fake claims raise the run index → different question seeds
+          const today = new Date().toLocaleDateString('sv')
+          for (let i = 0; i < runIndex; i += 1) {
+            s.claims[`seed-${i}`] = {
+              id: `seed-${i}`,
+              childId: 'theodore',
+              questId: 'math-mission',
+              role: 'bonus',
+              status: 'rejected', // rejected claims bump runIndex but keep the quest claimable
+              claimedAt: `${today}T08:00:00`,
+              decidedAt: `${today}T08:30:00`,
+              activityDate: today,
+            }
+          }
+        })
+        const { context, page } = await qaPage(browser, dev, seedJson(state))
+        await openHome(page)
+        await expandBonus(page)
+        await page
+          .locator('.quest-card', { hasText: "Builders' math" })
+          .getByRole('button', { name: /Start|Play/ })
+          .first()
+          .click()
+        await expect(page.locator('.challenge-prompt')).toBeVisible()
+        await page.waitForTimeout(600)
+        const prompts: string[] = []
+        for (let i = 0; i < 3; i += 1) {
+          const prompt = (await page.locator('.challenge-prompt').textContent()) ?? ''
+          prompts.push(prompt)
+          if (runIndex === 0) {
+            // every question type at this level, once
+            const slug = prompt.includes('MORE')
+              ? 'more'
+              : prompt.includes('smallest')
+                ? 'order'
+                : prompt.includes('boxes')
+                  ? 'groups'
+                  : prompt.includes('+ ?')
+                    ? 'missing'
+                    : prompt.includes('How many')
+                      ? 'count'
+                      : prompt.includes('−')
+                        ? 'sub'
+                        : 'add'
+            await shotOverlay(page, dev, `challenge-L${level}-${slug}`)
+            if (slug === 'sub') capturedSub = true
+          } else if (prompt.includes('−') && !capturedSub) {
+            capturedSub = true
+            await shotOverlay(page, dev, `challenge-L${level}-sub`)
+          }
+          // answer it (single step) then move on
+          const piles = page.locator('.pile-btn')
+          const opts = page.locator('.challenge-opt:not(:disabled)')
+          if ((await piles.count()) > 0) {
+            const a = await piles.first().locator('.token').count()
+            const bb = await piles.nth(1).locator('.token').count()
+            await piles.nth(a > bb ? 0 : 1).click()
+          } else {
+            const texts = await opts.allTextContents()
+            const m = prompt.match(/(\d+)\s*([+−-])\s*(\d+)\s*=\s*\?/)
+            const miss = prompt.match(/(\d+)\s*\+\s*\?\s*=\s*(\d+)/)
+            const gm = prompt.match(/(\d+) boxes of (\d+)/)
+            if (prompt.includes('smallest')) {
+              for (const n of texts.map(Number).sort((x, y) => x - y)) {
+                await page.locator('.challenge-opt', { hasText: new RegExp(`^${n}$`) }).click()
+              }
+            } else {
+              let ans: number | null = null
+              if (m) ans = m[2] === '+' ? Number(m[1]) + Number(m[3]) : Number(m[1]) - Number(m[3])
+              else if (miss) ans = Number(miss[2]) - Number(miss[1])
+              else if (gm) ans = Number(gm[1]) * Number(gm[2])
+              else if (prompt.includes('How many'))
+                ans = await page.locator('.challenge-pile').first().locator('.token').count()
+              if (ans !== null)
+                await opts.filter({ hasText: new RegExp(`^${ans}$`) }).first().click()
+            }
+          }
+          await page.waitForTimeout(950)
+        }
+        const reachedEnd = await page
+          .getByText(/All done|already/)
+          .isVisible()
+          .catch(() => false)
+        await context.close()
+        // found a subtraction at this level (or the run was exhausted)
+        const sawSub = capturedSub || prompts.some((pr) => pr.includes('−'))
+        if (sawSub && runIndex > 0) break
+        if (runIndex === 0 && level === 3) {
+          // level-3 send-error capture: fresh run, inject a pending claim before send
+          const { context: c2, page: p2 } = await qaPage(browser, dev, seedJson(state))
+          await openHome(p2)
+          await expandBonus(p2)
+          await p2
+            .locator('.quest-card', { hasText: "Builders' math" })
+            .getByRole('button', { name: /Start|Play/ })
+            .first()
+            .click()
+          await expect(p2.locator('.challenge-prompt')).toBeVisible()
+          // inject a same-day claim behind the open sheet → send must fail
+          await p2.evaluate(() => {
+            const st = JSON.parse(localStorage.getItem('wonderwood:v1') ?? '{}')
+            const today = new Date().toLocaleDateString('sv')
+            st.claims['behind'] = {
+              id: 'behind',
+              childId: 'theodore',
+              questId: 'math-mission',
+              role: 'bonus',
+              status: 'pending',
+              claimedAt: `${today}T09:00:00`,
+              activityDate: today,
+            }
+            localStorage.setItem('wonderwood:v1', JSON.stringify(st))
+          })
+          for (let i = 0; i < 3; i += 1) {
+            const prompt = (await p2.locator('.challenge-prompt').textContent().catch(() => '')) ?? ''
+            if (!prompt) break
+            const piles = p2.locator('.pile-btn')
+            const opts = p2.locator('.challenge-opt:not(:disabled)')
+            if ((await piles.count()) > 0) {
+              const a = await piles.first().locator('.token').count()
+              const bb = await piles.nth(1).locator('.token').count()
+              await piles.nth(a > bb ? 0 : 1).click()
+            } else {
+              const texts = await opts.allTextContents()
+              const m = prompt.match(/(\d+)\s*([+−-])\s*(\d+)\s*=\s*\?/)
+              const miss = prompt.match(/(\d+)\s*\+\s*\?\s*=\s*(\d+)/)
+              const gm = prompt.match(/(\d+) boxes of (\d+)/)
+              if (prompt.includes('smallest')) {
+                for (const n of texts.map(Number).sort((x, y) => x - y)) {
+                  await p2.locator('.challenge-opt', { hasText: new RegExp(`^${n}$`) }).click()
+                }
+              } else {
+                let ans: number | null = null
+                if (m) ans = m[2] === '+' ? Number(m[1]) + Number(m[3]) : Number(m[1]) - Number(m[3])
+                else if (miss) ans = Number(miss[2]) - Number(miss[1])
+                else if (gm) ans = Number(gm[1]) * Number(gm[2])
+                else if (prompt.includes('How many'))
+                  ans = await p2.locator('.challenge-pile').first().locator('.token').count()
+                if (ans !== null)
+                  await opts.filter({ hasText: new RegExp(`^${ans}$`) }).first().click()
+              }
+            }
+            await p2.waitForTimeout(950)
+          }
+          // send is only offered when the quest isn't already claimed (replay)
+          const send = p2.getByRole('button', { name: 'Send to a grown-up' })
+          if (await send.isVisible().catch(() => false)) {
+            await send.click()
+            await expect(p2.getByText('already waiting for a grown-up')).toBeVisible()
+            await shotOverlay(p2, dev, 'challenge-send-error')
+          }
+          await c2.close()
+          void reachedEnd
+        }
+        break
+      }
+    }
   }
 })
 

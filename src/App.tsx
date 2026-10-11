@@ -61,9 +61,30 @@ function stubSupabase(): SupabaseClient {
   } as unknown as SupabaseClient
 }
 
+/** Device-local "who was playing" — not game state, never synced. */
+const ACTIVE_CHILD_KEY = 'wonderwood:activeChild'
+
+function readActiveChild(): ChildId | null {
+  try {
+    const v = window.localStorage.getItem(ACTIVE_CHILD_KEY)
+    return v === 'theodore' || v === 'leonard' ? v : null
+  } catch {
+    return null // private mode etc.
+  }
+}
+function writeActiveChild(id: ChildId | null) {
+  try {
+    if (id === null) window.localStorage.removeItem(ACTIVE_CHILD_KEY)
+    else window.localStorage.setItem(ACTIVE_CHILD_KEY, id)
+  } catch {
+    // private mode — the picker will just show again next load
+  }
+}
+
 function Shell() {
-  const [screen, setScreen] = useState<Screen>('picker')
-  const [childId, setChildId] = useState<ChildId | null>(null)
+  const [remembered] = useState<ChildId | null>(() => readActiveChild())
+  const [screen, setScreen] = useState<Screen>(remembered ? 'home' : 'picker')
+  const [childId, setChildId] = useState<ChildId | null>(remembered)
   /** Where "Change my look" was opened from — return there on Done/Cancel. */
   const [lookReturn, setLookReturn] = useState<ChildTab>('home')
   const [onboardDone, setOnboardDone] = useState(false)
@@ -86,12 +107,20 @@ function Shell() {
   }
 
   const pickChild = (id: ChildId) => {
+    writeActiveChild(id)
     setChildId(id)
     setScreen('home')
   }
 
+  const switchExplorer = () => {
+    writeActiveChild(null)
+    setChildId(null)
+    setScreen('picker')
+  }
+
   if (screen === 'grownups') {
-    return <Grownups onExit={() => setScreen('picker')} />
+    // "Back to explorers" → the remembered child's home if there is one.
+    return <Grownups onExit={() => setScreen(readActiveChild() ? 'home' : 'picker')} />
   }
   if (screen === 'picker' || childId === null) {
     return <ProfilePicker onPick={pickChild} onGrownups={() => setScreen('grownups')} />
@@ -101,7 +130,7 @@ function Shell() {
       childId={childId}
       tab={screen}
       onTab={(t) => setScreen(t)}
-      onSwitch={() => setScreen('picker')}
+      onSwitch={switchExplorer}
       onLook={() => {
         if (screen !== 'look') setLookReturn(screen)
         setScreen('look')

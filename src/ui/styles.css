@@ -1698,6 +1698,7 @@ button {
 .sheet-backdrop {
   position: fixed;
   inset: 0;
+  overscroll-behavior: none;
   background: rgba(60, 60, 60, 0.35);
   display: flex;
   align-items: flex-end;
@@ -1708,6 +1709,7 @@ button {
 .sheet {
   max-height: 86dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--white);
   border: 2px solid var(--border);
   border-bottom-width: 5px;
@@ -1925,17 +1927,112 @@ button {
   margin: 6px 0 10px;
   color: var(--text);
 }
-.challenge-picture { display: flex; gap: 14px; justify-content: center; }
+.challenge-picture {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  min-height: 96px;
+}
 .challenge-pile {
-  font-size: 1.6rem;
-  max-width: 200px;
-  letter-spacing: 2px;
-  line-height: 1.5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+  align-content: center;
+  max-width: 168px;
   background: var(--surface-alt, #f7f7f7);
   border-radius: 14px;
-  padding: 8px 12px;
+  padding: 10px;
   min-height: 40px;
 }
+/* "Which pile has MORE?" — the piles themselves are the answers */
+.pile-btn {
+  border: 3px solid var(--border);
+  background: var(--white);
+  cursor: pointer;
+  min-height: 96px;
+  max-width: 168px;
+  min-width: 148px;
+  font: inherit;
+}
+.pile-btn:active {
+  border-color: var(--blue);
+  transform: translateY(2px);
+}
+.pile-sign {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--text-soft);
+}
+.token {
+  width: 34px;
+  height: 34px;
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.token-img, .token svg { width: 100%; height: 100%; display: block; }
+/* place-value tens rod */
+.token-rod {
+  width: 18px;
+  height: 34px;
+}
+.rod-badge, .group-badge {
+  position: absolute;
+  right: -7px;
+  bottom: -5px;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  font-size: 0.6rem;
+  font-weight: 900;
+  padding: 0 3px;
+  line-height: 1.3;
+}
+/* taken-away tokens — faded + greyed with a small cross, never a red X */
+.token-away {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+.away-cross {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+/* ordering slots — picked sequence builds left→right */
+.order-slots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 4px 0;
+}
+.order-slot {
+  width: 44px;
+  height: 44px;
+  border: 2.5px dashed var(--border);
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: var(--text);
+}
+.slot-filled {
+  border-style: solid;
+  border-color: var(--blue);
+  background: #ddf4fe;
+}
+/* reserved slot for hint/feedback — keeps options from jumping */
+.challenge-note {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+.challenge-note > p { margin: 0; }
 .challenge-hint {
   background: #fff6d6;
   border-radius: 10px;
@@ -2967,27 +3064,7 @@ button {
    QA fixes — missing class coverage + layout repairs
    ============================================================ */
 
-/* challenge tokens: inline SVGs have no intrinsic size, and <img> tokens
-   collapsed to 0×0 — give every token an explicit box. */
-.challenge-pile {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  align-items: center;
-  justify-content: center;
-}
-.token {
-  display: inline-block;
-  width: 36px;
-  height: 36px;
-  flex: none;
-}
-.token svg,
-img.token {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
+
 
 /* .form-input is used on bare inputs/selects (reading sheet, schedule
    editor, repairs, name-our-town) — give it the .field input look. */
@@ -3285,9 +3362,24 @@ input[type='datetime-local'].form-input {
 
 .look-actions {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+  max-width: 420px;
+  margin: 0 auto;
+  width: 100%;
+}
+.look-save {
+  width: 100%;
+}
+.look-actions-secondary {
+  display: flex;
   gap: 10px;
   justify-content: center;
-  flex-wrap: wrap;
+}
+.look-actions-secondary > .btn {
+  flex: 1;
+  min-height: 48px;
 }
 
 .room-buttons {

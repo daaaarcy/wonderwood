@@ -26,6 +26,32 @@ async function unlockGrownups(page: Page) {
   await expect(page.getByText('Waiting for you')).toBeVisible()
 }
 
+/* ---------------- remembered explorer ---------------- */
+
+test('chosen explorer is remembered across reload; switch clears it', async ({ page }) => {
+  await seededPage(page, freshState())
+  await pickExplorer(page, 'Leonard')
+  await expect(page.locator('.stat-bar')).toContainText('Leonard')
+  // reload → straight to Leonard's home, no picker
+  await page.reload()
+  await expect(page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
+  await expect(page.locator('.stat-bar')).toContainText('Leonard')
+  // grown-ups → back returns to the remembered child's home too
+  await page.getByLabel('Explorer menu').click()
+  await page.getByRole('menuitem', { name: 'Switch explorer' }).click()
+  await page.getByRole('button', { name: 'Grown-ups' }).click()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
+  // child was cleared by the switch → picker
+  await expect(page.getByRole('button', { name: 'Leonard' })).toBeVisible()
+  // pick again, switch to picker, reload → still the picker
+  await page.getByRole('button', { name: 'Leonard' }).click()
+  await expect(page.locator('.stat-bar')).toContainText('Leonard')
+  await page.getByLabel('Explorer menu').click()
+  await page.getByRole('menuitem', { name: 'Switch explorer' }).click()
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Theodore' })).toBeVisible()
+})
+
 /* ---------------- fixed child nav ---------------- */
 
 test('child nav stays visible after scrolling to the bottom', async ({ page }) => {
@@ -152,9 +178,9 @@ test('avatar editor: change look → save → persists across reload', async ({ 
   const after = await page.locator('.avatar-crop .avatar-body').first().getAttribute('src')
   expect(after).not.toBe(before)
 
-  // reload → look persists
+  // reload → explorer remembered (straight to home) and look persists
   await page.reload()
-  await pickExplorer(page, 'Theodore')
+  await expect(page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
   const reloaded = await page.locator('.avatar-crop .avatar-body').first().getAttribute('src')
   expect(reloaded).toBe(after)
 })

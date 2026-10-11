@@ -79,7 +79,7 @@ test('storybook friend numbers are identical after a reload', async ({ page }) =
   const before = await thisWeek(page).locator('.board-friend .board-score').allInnerTexts()
   expect(before).toHaveLength(3)
   await page.reload()
-  await page.getByRole('button', { name: 'Theodore' }).click()
+  // Theodore is remembered — reload lands straight on his home, no picker
   await expect(page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
   await page.getByRole('button', { name: 'League', exact: true }).click()
   const after = await thisWeek(page).locator('.board-friend .board-score').allInnerTexts()

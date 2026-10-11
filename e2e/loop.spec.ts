@@ -83,9 +83,9 @@ test('full loop: claim → approve → buy → room → persistence', async ({ p
   await page.getByRole('button', { name: 'Stop train' }).click()
   await expect(page.getByTestId('train-state')).toHaveText('stopped')
 
-  // --- reload: everything persists ---
+  // --- reload: everything persists, explorer remembered ---
   await page.reload()
-  await pickExplorer(page, 'Theodore')
+  await expect(page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
   await expect(page.getByTestId('coin-count')).toHaveText('10')
   await expect(page.getByTestId('project-road')).toHaveText('Road: 0 of 2 kits')
   await page.getByRole('button', { name: 'My room' }).click()
