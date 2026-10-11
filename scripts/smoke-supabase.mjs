@@ -56,7 +56,7 @@ try {
   const hid = ch.data?.householdId
   created.households.push(hid)
   check('createHousehold', !!hid)
-  check('household state is v7 + tz', ch.data?.state?.schemaVersion === 7 && ch.data?.state?.timeZone === 'America/Los_Angeles')
+  check('household state is v8 + tz', ch.data?.state?.schemaVersion === 8 && ch.data?.state?.timeZone === 'America/Los_Angeles')
 
   // anonymous cannot createHousehold
   mark('stranger anon'); const { error: ae } = await stranger.auth.signInAnonymously()

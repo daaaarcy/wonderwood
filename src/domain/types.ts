@@ -208,7 +208,7 @@ export interface CustomQuest {
 }
 
 export interface GameState {
-  schemaVersion: 7
+  schemaVersion: 8
   /** Grown-up-editable per-child settings. */
   config: Record<ChildId, ChildConfig>
   /** Schedule history — a day uses the latest entry with effectiveFrom ≤ day. */

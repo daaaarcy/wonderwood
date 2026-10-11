@@ -61,6 +61,9 @@ type GameStateV5 = Omit<GameStateV6, 'schemaVersion' | 'weekly' | 'badges' | 're
   schemaVersion: 5
 }
 
+/** v7 shape: v8 minus the dropped default housework job. */
+type GameStateV7 = Omit<GameState, 'schemaVersion'> & { schemaVersion: 7 }
+
 /* ---------------- validators ---------------- */
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -205,8 +208,29 @@ export const DEFAULT_CHILD_CONFIG: Record<ChildId, ChildConfig> = {
   },
 }
 
+/** Default housework job removed in v8. */
+const RETIRED_JOB = 'Put napkins on the table'
+
+/** v7 → v8: drop the retired default job from each child's job list. */
+function migrateV7(v7: GameStateV7): GameState {
+  return {
+    ...v7,
+    schemaVersion: 8,
+    config: {
+      theodore: {
+        ...v7.config.theodore,
+        houseworkJobs: v7.config.theodore.houseworkJobs.filter((j) => j !== RETIRED_JOB),
+      },
+      leonard: {
+        ...v7.config.leonard,
+        houseworkJobs: v7.config.leonard.houseworkJobs.filter((j) => j !== RETIRED_JOB),
+      },
+    },
+  }
+}
+
 /** v6 → v7: placed furniture (empty room per child) + grown-up custom quests. */
-function migrateV6(v6: GameStateV6): GameState {
+function migrateV6(v6: GameStateV6): GameStateV7 {
   return {
     ...v6,
     schemaVersion: 7,
@@ -280,24 +304,29 @@ export function migrateState(raw: unknown, ctx: MigrateCtx): GameState | null {
     } else if (version === 2) {
       v2 = isValidV2(value) ? (value as unknown as GameStateV2) : null
     }
-    if (v2) return migrateV6(migrateV5(migrateV4(migrateV3(migrateV2(v2), ctx.timeZone), ctx)))
+    if (v2)
+      return migrateV7(migrateV6(migrateV5(migrateV4(migrateV3(migrateV2(v2), ctx.timeZone), ctx))))
     if (version === 3) {
       const v3 = isValidV3(value) ? (value as unknown as GameStateV3) : null
-      return v3 ? migrateV6(migrateV5(migrateV4(migrateV3(v3, ctx.timeZone), ctx))) : null
+      return v3 ? migrateV7(migrateV6(migrateV5(migrateV4(migrateV3(v3, ctx.timeZone), ctx)))) : null
     }
     if (version === 4) {
       const v4 = isValidV4(value) ? (value as unknown as GameStateV4) : null
-      return v4 ? migrateV6(migrateV5(migrateV4(v4, ctx))) : null
+      return v4 ? migrateV7(migrateV6(migrateV5(migrateV4(v4, ctx)))) : null
     }
     if (version === 5) {
       const v5 = isValidV5(value) ? (value as unknown as GameStateV5) : null
-      return v5 ? migrateV6(migrateV5(v5)) : null
+      return v5 ? migrateV7(migrateV6(migrateV5(v5))) : null
     }
     if (version === 6) {
       const v6 = isValidV6(value) ? (value as unknown as GameStateV6) : null
-      return v6 ? migrateV6(v6) : null
+      return v6 ? migrateV7(migrateV6(v6)) : null
     }
-    if (version === 7) return isValidV7(value) ? (value as unknown as GameState) : null
+    if (version === 7) {
+      const v7 = isValidV7(value) ? (value as unknown as GameStateV7) : null
+      return v7 ? migrateV7(v7) : null
+    }
+    if (version === 8) return isValidV7(value) ? (value as unknown as GameState) : null
     return null
   } catch {
     return null

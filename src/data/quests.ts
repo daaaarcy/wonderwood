@@ -168,6 +168,5 @@ export const DEFAULT_HOUSEWORK_JOBS = [
   'Put away the agreed toys',
   'Sort the socks',
   'Arrange the books',
-  'Put napkins on the table',
   'Water a plant',
 ]

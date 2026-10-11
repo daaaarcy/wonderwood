@@ -39,7 +39,7 @@ function initialChild(): ChildState {
 export function initialState(now: Date = new Date(), timeZone = 'UTC'): GameState {
   const at = now.toISOString()
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     timeZone,
     createdAt: at,
     config: structuredClone(DEFAULT_CHILD_CONFIG),
