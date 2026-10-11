@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { EventBus } from '../EventBus'
 import { GAME_HEIGHT, GAME_WIDTH } from '../assets'
 import { itemById } from '../../data/catalogue'
-import type { ChildId } from '../../domain/types'
+import type { ChildId, FurnitureSpot } from '../../domain/types'
 import { CHILDREN } from '../../data/children'
 
 export interface RoomStatePayload {
@@ -10,13 +10,68 @@ export interface RoomStatePayload {
   /** itemId of equipped hat / toy, or null. */
   hat: string | null
   toy: string | null
+  /** furniture item ids per room spot (v7). */
+  placed: Partial<Record<FurnitureSpot, string>>
 }
 
 const EXPLORER_HEIGHT = 250
 const HAT_WIDTH = 105
 const TRACK = { cx: 620, cy: 596, rx: 250, ry: 62 }
 
+/** Where each room spot sits + how wide the item may be. */
+const SPOTS: Record<FurnitureSpot, { x: number; y: number; w: number; origin: 'bottom' | 'center' }> =
+  {
+    bed: { x: 185, y: 552, w: 295, origin: 'bottom' },
+    rug: { x: 620, y: 596, w: 360, origin: 'center' },
+    chair: { x: 712, y: 594, w: 120, origin: 'bottom' },
+    desk: { x: 775, y: 545, w: 235, origin: 'bottom' },
+    computer: { x: 768, y: 458, w: 95, origin: 'bottom' },
+    shelf: { x: 935, y: 560, w: 102, origin: 'bottom' },
+    lamp: { x: 622, y: 562, w: 78, origin: 'bottom' },
+    'decor-a': { x: 150, y: 190, w: 118, origin: 'center' },
+    'decor-b': { x: 552, y: 190, w: 118, origin: 'center' },
+  }
+
+/**
+ * World depth per spot: rug(1) under the track(2) and train(3);
+ * furniture over the track so the train slips behind it on the back stretch;
+ * explorer(6) always in front.
+ */
+const SPOT_DEPTH: Record<FurnitureSpot, number> = {
+  rug: 1,
+  bed: 4,
+  shelf: 4.2,
+  lamp: 4.3,
+  desk: 4.4,
+  computer: 4.5,
+  chair: 4.6,
+  'decor-a': 4.7,
+  'decor-b': 4.8,
+}
+
+/** key → SVG viewBox size (Phaser needs both dims to rasterize SVGs). */
+const FURNITURE_SIZES: Record<string, [number, number]> = {
+  'bed-default': [300, 170],
+  'bed-cosy': [300, 170],
+  'bed-house': [300, 170],
+  'rug-round': [360, 120],
+  'rug-cloud': [360, 120],
+  'chair-beanbag': [130, 130],
+  'chair-wood': [130, 130],
+  'desk-explorer': [240, 150],
+  'desk-corner': [240, 150],
+  'computer-laptop': [110, 80],
+  'computer-desktop': [110, 90],
+  'shelf-books': [110, 240],
+  'lamp-floor': [90, 240],
+  'decor-plant': [130, 140],
+  'decor-rocket': [120, 140],
+  'decor-garland': [140, 110],
+  'decor-frame': [120, 100],
+}
+
 export class RoomScene extends Phaser.Scene {
+  private bg!: Phaser.GameObjects.Image
   private charGroup!: Phaser.GameObjects.Container
   private bobber!: Phaser.GameObjects.Container
   private bodyImage: Phaser.GameObjects.Image | null = null
@@ -25,6 +80,8 @@ export class RoomScene extends Phaser.Scene {
   private trainT = 0.75
   private trainRunning = false
   private smokeTimer = 0
+  private furnitureItems: Phaser.GameObjects.Image[] = []
+  private lastPlaced = ''
 
   constructor() {
     super('RoomScene')
@@ -32,18 +89,27 @@ export class RoomScene extends Phaser.Scene {
 
   preload() {
     this.load.svg('room-bg', 'assets/room-bg.svg', { width: 1000, height: 700 })
+    this.load.svg('room-bg-leonard', 'assets/room-bg-leonard.svg', { width: 1000, height: 700 })
     this.load.svg('explorer-theodore', 'assets/explorer-theodore.svg', { width: 400, height: 480 })
     this.load.svg('explorer-theodore-blink', 'assets/explorer-theodore-blink.svg', { width: 400, height: 480 })
     this.load.svg('explorer-leonard', 'assets/explorer-leonard.svg', { width: 400, height: 480 })
     this.load.svg('explorer-leonard-blink', 'assets/explorer-leonard-blink.svg', { width: 400, height: 480 })
     this.load.svg('hat-leaf', 'assets/hat-leaf.svg', { width: 240, height: 180 })
     this.load.svg('toy-train', 'assets/toy-train.svg', { width: 320, height: 220 })
+    for (const [key, [w, h]] of Object.entries(FURNITURE_SIZES)) {
+      this.load.svg(key, `assets/${key}.svg`, { width: w * 2, height: h * 2 })
+    }
   }
 
   create() {
-    this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'room-bg').setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+    this.bg = this.add
+      .image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'room-bg')
+      .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
 
-    this.buildTrack()
+    // scene restarts (room re-visit) destroy all objects — forget the old list
+    this.furnitureItems = []
+    this.lastPlaced = ''
+    this.buildTrack() // under furniture
     this.buildExplorer()
 
     EventBus.on('room-state', this.applyState, this)
@@ -76,7 +142,8 @@ export class RoomScene extends Phaser.Scene {
   }
 
   private buildTrack() {
-    const g = this.add.graphics()
+    // order: bg → rug → track → train → furniture → explorer
+    const g = this.add.graphics().setDepth(2)
     const { cx, cy, rx, ry } = TRACK
     // sleepers
     g.lineStyle(6, 0xa06a42, 1)
@@ -95,7 +162,7 @@ export class RoomScene extends Phaser.Scene {
   }
 
   private buildExplorer() {
-    this.charGroup = this.add.container(280, 585)
+    this.charGroup = this.add.container(280, 585).setDepth(6)
     this.charGroup.setData('baseY', 585)
     this.bobber = this.add.container(0, 0)
     this.charGroup.add(this.bobber)
@@ -125,9 +192,56 @@ export class RoomScene extends Phaser.Scene {
     })
   }
 
+  /** Tappable furniture image at a spot; taps bubble up to the React picker. */
+  private placeFurniture(spot: FurnitureSpot, itemId: string) {
+    const item = itemById(itemId)
+    const layout = SPOTS[spot]
+    if (!item || !layout) return
+    const img = this.add.image(layout.x, layout.y, item.assetKey)
+    img.setDisplaySize(layout.w, (layout.w * img.height) / img.width)
+    if (layout.origin === 'bottom') img.setOrigin(0.5, 1)
+    img.setDepth(SPOT_DEPTH[spot])
+    img.setInteractive({ useHandCursor: true })
+    img.on('pointerdown', () => {
+      // little "boop" bounce then tell React which spot was tapped
+      this.tweens.add({
+        targets: img,
+        scaleX: img.scaleX * 1.06,
+        scaleY: img.scaleY * 1.06,
+        duration: 110,
+        yoyo: true,
+      })
+      EventBus.emit('room-tap', { spot })
+    })
+    this.furnitureItems.push(img)
+  }
+
+  /** Rebuild all placed furniture (bed falls back to the free starter bed). */
+  private renderFurniture(placed: RoomStatePayload['placed']) {
+    for (const img of this.furnitureItems) img.destroy()
+    this.furnitureItems = []
+    for (const spot of Object.keys(SPOTS) as FurnitureSpot[]) {
+      let itemId = placed[spot]
+      if (spot === 'bed' && itemId == null) itemId = 'bed-default'
+      if (!itemId) continue
+      this.placeFurniture(spot, itemId)
+    }
+  }
+
   private applyState(payload: RoomStatePayload) {
     if (!this.sys.displayList) return // scene is gone (destroy called)
     const def = CHILDREN[payload.childId]
+
+    // per-child room tint
+    const bgKey = payload.childId === 'leonard' ? 'room-bg-leonard' : 'room-bg'
+    if (this.bg.texture.key !== bgKey) this.bg.setTexture(bgKey)
+
+    // furniture — cheap rebuild, only when it actually changed
+    const placedKey = JSON.stringify(payload.placed ?? {})
+    if (placedKey !== this.lastPlaced) {
+      this.lastPlaced = placedKey
+      this.renderFurniture(payload.placed ?? {})
+    }
 
     // rebuild body (cheap enough to redo on every state push)
     this.bobber.removeAll(true)
@@ -155,7 +269,7 @@ export class RoomScene extends Phaser.Scene {
     // train visible only while the toy is equipped
     const showTrain = payload.toy === 'toy-train'
     if (showTrain && !this.train) {
-      this.train = this.add.image(0, 0, 'toy-train').setDisplaySize(120, 82)
+      this.train = this.add.image(0, 0, 'toy-train').setDisplaySize(120, 82).setDepth(3)
       // origin at the wheel line (wheels bottom ~y103 of the 110-tall svg)
       // so the wheels ride exactly on the track ellipse
       this.train.setOrigin(0.5, 0.94)

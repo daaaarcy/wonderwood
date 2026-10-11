@@ -7,6 +7,7 @@ import { CHILD_LIST } from '../../data/children'
 import { questById } from '../../data/quests'
 import { ScheduleEditor } from '../components/ScheduleEditor'
 import { RepairsPanel } from '../components/RepairsPanel'
+import { TasksPanel } from '../components/TasksPanel'
 import { assetUrl } from '../../game/assets'
 import { useGameState, useRepository } from '../../storage/hooks'
 import { LeagueBadge } from '../components/LeagueBadge'
@@ -133,13 +134,14 @@ export function Grownups({ onExit }: { onExit: () => void }) {
           {pending.map((claim) => {
             const quest = questById(claim.questId)
             const child = CHILD_LIST.find((c) => c.id === claim.childId)
+            const label = quest?.label ?? claim.questTitle ?? claim.questId
             return (
               <li key={claim.id} className="claim-row">
                 <div className="claim-info">
                   <strong style={{ color: child?.darkColor }}>{child?.name}</strong>
-                  <span>{quest?.label ?? claim.questId}</span>
+                  <span>{label}</span>
                   <span className={`tag role-tag role-${claim.role}`}>
-                    {claim.role === 'core' ? 'Core' : 'Bonus'}
+                    {claim.role === 'core' ? 'Core' : claim.role === 'bonus' ? 'Bonus' : 'Grown-up task'}
                   </span>
                   {claim.details && <span className="muted">{detailText(claim)}</span>}
                   <span className="muted">
@@ -172,6 +174,8 @@ export function Grownups({ onExit }: { onExit: () => void }) {
           })}
         </ul>
       </section>
+
+      <TasksPanel pin={unlockedPin} />
 
       {state.city.currentProjectId === null && (
         <section className="panel next-building" aria-label="Choose the next building">
@@ -261,22 +265,30 @@ export function Grownups({ onExit }: { onExit: () => void }) {
               <p className="muted">Rest day today.</p>
             ) : (
               <ul className="claim-list">
-                {[...todayView.core, ...todayView.bonus].map((t) => {
+                {[...todayView.core, ...todayView.custom, ...todayView.bonus].map((t) => {
                   const quest = questById(t.questId)
-                  if (!quest) return null
+                  const custom = state.customQuests[t.questId]
                   const isCore = todayView.core.some((c) => c.questId === t.questId)
+                  const isCustom = !isCore && custom != null
+                  if (!quest && !custom) return null
                   return (
-                    <li key={quest.id} className="claim-row">
+                    <li key={t.questId} className="claim-row">
                       <div className="claim-info">
-                        <img src={assetUrl(quest.iconKey)} alt="" className="quest-icon-small" />
+                        {quest && <img src={assetUrl(quest.iconKey)} alt="" className="quest-icon-small" />}
                         <span>
-                          {quest.label}
-                          {quest.id === 'violin' && state.config[child.id].violinGoal && (
+                          {quest?.label ?? custom?.title}
+                          {quest?.id === 'violin' && state.config[child.id].violinGoal && (
                             <span className="muted"> — {state.config[child.id].violinGoal}</span>
                           )}
+                          {isCustom && custom && (
+                            <span className="muted">
+                              {' '}
+                              — +{custom.coins} coins{custom.stars > 0 ? `, +${custom.stars}★` : ''}
+                            </span>
+                          )}
                         </span>
-                        <span className={`tag role-tag role-${isCore ? 'core' : 'bonus'}`}>
-                          {isCore ? 'Core' : 'Bonus'}
+                        <span className={`tag role-tag role-${isCore ? 'core' : isCustom ? 'custom' : 'bonus'}`}>
+                          {isCore ? 'Core' : isCustom ? 'Grown-up' : 'Bonus'}
                         </span>
                       </div>
                       <div className="claim-actions">
@@ -288,8 +300,8 @@ export function Grownups({ onExit }: { onExit: () => void }) {
                                 {
                                   type: 'parentCompleteAndApprove',
                                   childId: child.id,
-                                  questId: quest.id,
-                                  claimId: `parent:${child.id}:${quest.id}:${today}`,
+                                  questId: t.questId,
+                                  claimId: `parent:${child.id}:${t.questId}:${today}`,
                                 },
                                 { pin: unlockedPin ?? undefined },
                               )

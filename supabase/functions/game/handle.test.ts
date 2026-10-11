@@ -289,9 +289,9 @@ describe('v5: grown-up commands + migration on load', () => {
     })
     expect(claim.status).toBe(200)
     expect((claim.json as { result: { ok: boolean } }).result.ok).toBe(true)
-    // the persisted doc is migrated v5
+    // the persisted doc is migrated to the latest schema
     const stored = store.households.get(hid)!.state
-    expect(stored.schemaVersion).toBe(6)
+    expect(stored.schemaVersion).toBe(7)
     expect(stored.scheduleHistory.length).toBeGreaterThan(0)
   })
 })
@@ -338,5 +338,87 @@ describe('v6: grown-up commands require PIN, child commands do not', () => {
     })
     expect(ack.status).toBe(200)
     expect((ack.json as { result: { ok: boolean } }).result.ok).toBe(true)
+  })
+})
+
+describe('v7: custom tasks + furniture', () => {
+  it('createCustomQuest/updateCustomQuest require the PIN; placeItem does not', async () => {
+    const store = new FakeStore()
+    const hid = await store.seed()
+    await store.setPin(hid, '1234')
+    const create = {
+      type: 'createCustomQuest',
+      questId: 'cq-e2e',
+      title: 'Tidy the blocks',
+      coins: 8,
+      stars: 1,
+      childIds: ['leonard'],
+      days: [],
+    }
+    const noPin = await call(store, GROWN, 'command', { householdId: hid, command: create })
+    expect(noPin.status).toBe(403)
+    const withPin = await call(store, GROWN, 'command', { householdId: hid, pin: '1234', command: create })
+    expect(withPin.status).toBe(200)
+    expect((withPin.json as { result: { ok: boolean } }).result.ok).toBe(true)
+
+    const update = { type: 'updateCustomQuest', id: 'cq-e2e', patch: { active: false } }
+    const noPin2 = await call(store, GROWN, 'command', { householdId: hid, command: update })
+    expect(noPin2.status).toBe(403)
+    const withPin2 = await call(store, GROWN, 'command', { householdId: hid, pin: '1234', command: update })
+    expect(withPin2.status).toBe(200)
+
+    // a kid device can place furniture without a PIN
+    const pr = await call(store, GROWN, 'createPairingCode', { householdId: hid })
+    await call(store, KID, 'pairDevice', { code: (pr.json as { code: string }).code })
+    const place = await call(store, KID, 'command', {
+      householdId: hid,
+      command: { type: 'placeItem', childId: 'theodore', spot: 'rug', itemId: null },
+    })
+    expect(place.status).toBe(200)
+    expect((place.json as { result: { ok: boolean } }).result.ok).toBe(true)
+  })
+
+  it('full flow: grown-up creates, kid claims, grown-up approves with configured reward', async () => {
+    const store = new FakeStore()
+    const hid = await store.seed()
+    await store.setPin(hid, '1234')
+    const pr = await call(store, GROWN, 'createPairingCode', { householdId: hid })
+    await call(store, KID, 'pairDevice', { code: (pr.json as { code: string }).code })
+
+    await call(store, GROWN, 'command', {
+      householdId: hid,
+      pin: '1234',
+      command: {
+        type: 'createCustomQuest',
+        questId: 'cq-flow',
+        title: 'Set the table',
+        coins: 12,
+        stars: 2,
+        childIds: ['theodore'],
+        days: [],
+      },
+    })
+    // the unassigned sibling cannot claim it
+    const wrongKid = await call(store, KID, 'command', {
+      householdId: hid,
+      command: { type: 'claimQuest', childId: 'leonard', questId: 'cq-flow', claimId: 'f-bad' },
+    })
+    expect((wrongKid.json as { result: { ok: boolean } }).result.ok).toBe(false)
+    // the assigned child claims + the grown-up approves
+    const claim = await call(store, KID, 'command', {
+      householdId: hid,
+      command: { type: 'claimQuest', childId: 'theodore', questId: 'cq-flow', claimId: 'f-1' },
+    })
+    expect((claim.json as { result: { ok: boolean } }).result.ok).toBe(true)
+    const approve = await call(store, GROWN, 'command', {
+      householdId: hid,
+      pin: '1234',
+      command: { type: 'approveClaim', claimId: 'f-1' },
+    })
+    expect(approve.status).toBe(200)
+    const st = store.households.get(hid)!.state
+    expect(st.children.theodore.coins).toBe(32) // 20 welcome + 12
+    expect(st.children.theodore.stars).toBe(2)
+    expect(st.claims['f-1'].questTitle).toBe('Set the table')
   })
 })

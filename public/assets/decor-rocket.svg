@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140">
+  <!-- rocket poster pinned to the wall -->
+  <rect x="14" y="10" width="92" height="120" rx="8" fill="#3c3c6e"/>
+  <rect x="20" y="16" width="80" height="108" rx="6" fill="#5a5aa0"/>
+  <g fill="#ffffff">
+    <circle cx="34" cy="32" r="2.4"/>
+    <circle cx="88" cy="28" r="2.4"/>
+    <circle cx="96" cy="88" r="2.4"/>
+    <circle cx="30" cy="104" r="2.4"/>
+    <circle cx="50" cy="58" r="1.8"/>
+  </g>
+  <!-- rocket -->
+  <path d="M60 34 q16 18 16 40 l-32 0 q0 -22 16 -40 z" fill="#ff4b4b"/>
+  <circle cx="60" cy="54" r="9" fill="#eafbff"/>
+  <circle cx="60" cy="54" r="5.5" fill="#7ed6f2"/>
+  <path d="M44 74 l-12 18 16 -6 z" fill="#ffc800"/>
+  <path d="M76 74 l12 18 -16 -6 z" fill="#ffc800"/>
+  <path d="M52 78 q8 22 8 30 q2 -6 8 -6 q6 0 8 6 q0 -8 8 -30 z" fill="#ff9600"/>
+  <!-- pin -->
+  <circle cx="60" cy="16" r="5" fill="#ffc800"/>
+</svg>

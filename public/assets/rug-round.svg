@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120">
+  <!-- round braided rug with happy rings -->
+  <ellipse cx="180" cy="62" rx="172" ry="52" fill="#ffc800"/>
+  <ellipse cx="180" cy="62" rx="140" ry="41" fill="#ffe066"/>
+  <ellipse cx="180" cy="62" rx="104" ry="29" fill="#58cc02"/>
+  <ellipse cx="180" cy="62" rx="72" ry="19" fill="#a9e34b"/>
+  <g fill="#ff9600">
+    <ellipse cx="120" cy="60" rx="10" ry="5"/>
+    <ellipse cx="180" cy="55" rx="10" ry="5"/>
+    <ellipse cx="240" cy="60" rx="10" ry="5"/>
+  </g>
+</svg>

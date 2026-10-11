@@ -7,9 +7,12 @@ import type {
   Command,
   CommandDeps,
   CommandOutcome,
+  CustomQuest,
   DaySchedule,
   DomainError,
+  FurnitureSpot,
   GameState,
+  ItemSpot,
   LedgerEntry,
   ProjectId,
   Purchase,
@@ -22,6 +25,8 @@ import {
   CHILD_IDS,
   CITY_PALETTE,
   CORE_REWARD,
+  DECOR_SPOTS,
+  FURNITURE_SPOTS,
   MAX_LEAGUE_RANK,
   REPAIR_PRUNE_DAYS,
   WEEKLY_COINS,
@@ -66,6 +71,7 @@ function bonusRewardsUsed(state: GameState, childId: ChildId, dateKey: string): 
   return Object.values(state.claims).filter(
     (c) =>
       c.childId === childId &&
+      c.role !== 'custom' &&
       c.activityDate === dateKey &&
       c.status === 'approved' &&
       c.reward?.coins === BONUS_REWARD.coins,
@@ -91,6 +97,12 @@ function coreRewardUsed(state: GameState, childId: ChildId, questId: string, dat
  * Exported so the grown-up approvals list can preview the reward.
  */
 export function rewardForApproval(state: GameState, claim: Claim): { coins: number; stars: number } {
+  // Custom tasks pay exactly the reward the grown-up configured — never the
+  // shared core/bonus rewards, and they don't touch the bonus slots.
+  if (claim.role === 'custom') {
+    const q = state.customQuests[claim.questId]
+    return { coins: q?.coins ?? 0, stars: q?.stars ?? 0 }
+  }
   const isFirstCoreForQuest =
     claim.role === 'core' && !coreRewardUsed(state, claim.childId, claim.questId, claim.activityDate)
   if (isFirstCoreForQuest) return CORE_REWARD
@@ -139,9 +151,19 @@ function approvedClaimsInWeek(state: GameState, childId: ChildId, weekKey: strin
   )
 }
 
+/** Active custom quests assigned to `childId` that are scheduled on `dateKey`. */
+export function customQuestsOn(state: GameState, childId: ChildId, dateKey: string): CustomQuest[] {
+  const weekday = (weekdayOf(dateKey) + 6) % 7
+  return Object.values(state.customQuests).filter(
+    (q) =>
+      q.active && q.childIds.includes(childId) && (q.days.length === 0 || q.days.includes(weekday)),
+  )
+}
+
 /**
  * Eligible days + opportunities in week `weekKey` for a child: days ≥ createdAt,
- * ≤ throughKey, not paused, with ≥1 scheduled core quest.
+ * ≤ throughKey, not paused, with ≥1 scheduled core quest or custom task.
+ * Each scheduled custom task counts as one opportunity (same as a core quest).
  */
 export function weekEligibility(
   state: GameState,
@@ -159,18 +181,22 @@ export function weekEligibility(
     if (state.pausedDates[childId].includes(d)) continue
     const weekday = (weekdayOf(d) + 6) % 7 // 0=Mon..6=Sun
     const core = scheduleForDate(state, d)[childId].core[weekday] ?? []
-    if (core.length > 0) {
+    const custom = customQuestsOn(state, childId, d).length
+    if (core.length + custom > 0) {
       days += 1
-      opportunities += core.length
+      opportunities += core.length + custom
     }
   }
   return { eligibleDays: days, opportunities }
 }
 
-/** Approved claims that carried the core reward (the first approval per quest/day). */
+/**
+ * Approved claims that carried a star reward: the first core approval per
+ * quest/day, plus approved custom tasks that award ≥1★ (same as core).
+ */
 function approvedCoreClaimsInWeek(state: GameState, childId: ChildId, weekKey: string): Claim[] {
   return approvedClaimsInWeek(state, childId, weekKey).filter(
-    (c) => c.role === 'core' && (c.reward?.stars ?? 1) > 0,
+    (c) => (c.role === 'core' || c.role === 'custom') && (c.reward?.stars ?? 1) > 0,
   )
 }
 
@@ -281,14 +307,25 @@ export function acknowledgePromotion(
 
 /* ---------------- Claims ---------------- */
 
-/** The schedule role a quest has for a child on a date; null when neither. */
+/**
+ * The schedule role a quest has for a child on a date; null when neither.
+ * Custom quests resolve to 'custom' (they never sit in the core/bonus plan).
+ */
 export function questRoleOn(
   state: GameState,
   childId: ChildId,
   questId: string,
   dateKey: string,
-): 'core' | 'bonus' | null {
+): 'core' | 'bonus' | 'custom' | null {
   const weekday = (weekdayOf(dateKey) + 6) % 7
+  const custom = state.customQuests[questId]
+  if (custom) {
+    return custom.active &&
+      custom.childIds.includes(childId) &&
+      (custom.days.length === 0 || custom.days.includes(weekday))
+      ? 'custom'
+      : null
+  }
   const day = scheduleForDate(state, dateKey)[childId]
   if ((day.core[weekday] ?? []).includes(questId)) return 'core'
   if (day.bonus.includes(questId)) return 'bonus'
@@ -302,7 +339,11 @@ function insertClaim(
   deps: CommandDeps,
 ): CommandOutcome<Claim> {
   const quest = deps.getQuest(cmd.questId)
-  if (!quest || quest.retired || !quest.childIds.includes(cmd.childId)) {
+  const custom = state.customQuests[cmd.questId]
+  const known =
+    (quest && !quest.retired && quest.childIds.includes(cmd.childId)) ||
+    (custom && custom.childIds.includes(cmd.childId))
+  if (!known) {
     return { state, result: err('unknown-quest', 'That quest does not exist.') }
   }
   const existing = state.claims[cmd.claimId]
@@ -337,6 +378,8 @@ function insertClaim(
     status: 'pending',
     claimedAt: now.toISOString(),
     details: cmd.details,
+    // Custom claims carry their title so archived tasks still render.
+    questTitle: role === 'custom' ? custom?.title : undefined,
   }
   return { state: withClaim(state, claim), result: ok(claim) }
 }
@@ -431,6 +474,28 @@ export function parentCompleteAndApprove(
 
 /* ---------------- Shop ---------------- */
 
+/** Does an item with `itemSpot` fit into room `spot`? ('decor' fits both.) */
+export function spotFits(itemSpot: ItemSpot | undefined, spot: FurnitureSpot): boolean {
+  if (!itemSpot) return false
+  if (itemSpot === spot) return true
+  return itemSpot === 'decor' && (DECOR_SPOTS as readonly string[]).includes(spot)
+}
+
+/** The spots a furniture item can go in (decor → both decor spots). */
+export function spotsFor(itemSpot: ItemSpot | undefined): FurnitureSpot[] {
+  if (!itemSpot) return []
+  if (itemSpot === 'decor') return [...DECOR_SPOTS]
+  return [itemSpot]
+}
+
+/** First compatible empty spot for a furniture item, if any. */
+function firstFreeSpot(
+  placed: Partial<Record<FurnitureSpot, string>>,
+  itemSpot: ItemSpot | undefined,
+): FurnitureSpot | undefined {
+  return spotsFor(itemSpot).find((s) => placed[s] == null)
+}
+
 export function purchase(
   state: GameState,
   cmd: { childId: ChildId; itemId: string; purchaseId: string },
@@ -466,6 +531,13 @@ export function purchase(
     at,
   }
   const clearedWish = child.wishItem === cmd.itemId ? null : child.wishItem
+  // Furniture goes straight into the room when a compatible spot is free —
+  // otherwise it waits in the inventory for a manual place/swap.
+  const placed = { ...child.placed }
+  if (item.slot === 'furniture') {
+    const free = firstFreeSpot(placed, item.spot)
+    if (free) placed[free] = item.id
+  }
   let next: GameState = {
     ...state,
     children: {
@@ -474,6 +546,7 @@ export function purchase(
         ...child,
         coins: child.coins - item.price,
         inventory: [...child.inventory, cmd.itemId],
+        placed,
         wishItem: clearedWish,
       },
     },
@@ -520,6 +593,47 @@ export function equip(
     ...child,
     equipped: { ...child.equipped, [cmd.slot]: cmd.itemId },
   })
+  return { state: next, result: ok(next) }
+}
+
+/**
+ * Put an owned furniture item into a room spot, or clear the spot with
+ * itemId:null. One item per spot; placing a different owned item swaps it in.
+ * An item can only sit in one spot — placing it somewhere moves it.
+ */
+export function placeItem(
+  state: GameState,
+  cmd: { childId: ChildId; spot: FurnitureSpot; itemId: string | null },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<GameState> {
+  void now
+  if (!(FURNITURE_SPOTS as readonly string[]).includes(cmd.spot)) {
+    return { state, result: err('wrong-slot', 'That spot does not exist.') }
+  }
+  const child = state.children[cmd.childId]
+  const placed = { ...child.placed }
+  if (cmd.itemId === null) {
+    delete placed[cmd.spot]
+    const next = withChild(state, cmd.childId, { ...child, placed })
+    return { state: next, result: ok(next) }
+  }
+  const item = deps.getItem(cmd.itemId)
+  if (!item) {
+    return { state, result: err('unknown-item', 'That item does not exist.') }
+  }
+  if (item.slot !== 'furniture' || !spotFits(item.spot, cmd.spot)) {
+    return { state, result: err('wrong-slot', 'That item does not go there.') }
+  }
+  if (!child.inventory.includes(cmd.itemId)) {
+    return { state, result: err('item-not-owned', 'You do not own that yet.') }
+  }
+  // One copy in one spot: remove the item from any other spot first.
+  for (const s of FURNITURE_SPOTS) {
+    if (placed[s] === cmd.itemId) delete placed[s]
+  }
+  placed[cmd.spot] = cmd.itemId
+  const next = withChild(state, cmd.childId, { ...child, placed })
   return { state: next, result: ok(next) }
 }
 
@@ -957,6 +1071,116 @@ export function setWeeklyChallenge(
   return { state: next, result: ok(next) }
 }
 
+/* ---------------- grown-up custom tasks ---------------- */
+
+const CUSTOM_TITLE_MAX = 60
+const CUSTOM_COINS_MAX = 99
+const CUSTOM_STARS_MAX = 5
+
+/** Normalized valid fields, or an error. `questId` is not part of the input. */
+function validateCustomQuest(input: {
+  title: string
+  coins: number
+  stars: number
+  childIds: ChildId[]
+  days: number[]
+}): Result<{ title: string; coins: number; stars: number; childIds: ChildId[]; days: number[] }> {
+  const title = input.title.trim().replace(/\s+/g, ' ')
+  if (title.length < 1 || title.length > CUSTOM_TITLE_MAX) {
+    return err('invalid-quest', 'Task names are 1–60 letters.')
+  }
+  if (!Number.isInteger(input.coins) || input.coins < 0 || input.coins > CUSTOM_COINS_MAX) {
+    return err('invalid-quest', `Coins must be 0–${CUSTOM_COINS_MAX}.`)
+  }
+  if (!Number.isInteger(input.stars) || input.stars < 0 || input.stars > CUSTOM_STARS_MAX) {
+    return err('invalid-quest', `Stars must be 0–${CUSTOM_STARS_MAX}.`)
+  }
+  const childIds = [...new Set(input.childIds)]
+  if (childIds.length === 0 || !childIds.every((c) => CHILD_IDS.includes(c))) {
+    return err('invalid-quest', 'Pick at least one explorer.')
+  }
+  const days = [...new Set(input.days)]
+  if (!days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) {
+    return err('invalid-quest', 'Days must be weekdays 0–6.')
+  }
+  return ok({ title, coins: input.coins, stars: input.stars, childIds, days: days.sort((a, b) => a - b) })
+}
+
+/** Grown-ups write a task; `questId` is caller-supplied for idempotency. */
+export function createCustomQuest(
+  state: GameState,
+  cmd: {
+    questId: string
+    title: string
+    coins: number
+    stars: number
+    childIds: ChildId[]
+    days: number[]
+  },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<CustomQuest> {
+  void deps
+  const existing = state.customQuests[cmd.questId]
+  if (existing) {
+    return { state, result: ok(existing) }
+  }
+  const clean = validateCustomQuest(cmd)
+  if (!clean.ok) {
+    return { state, result: clean }
+  }
+  const quest: CustomQuest = {
+    id: cmd.questId,
+    ...clean.value,
+    createdAt: now.toISOString(),
+    active: true,
+  }
+  const next: GameState = {
+    ...state,
+    customQuests: { ...state.customQuests, [quest.id]: quest },
+  }
+  return { state: next, result: ok(quest) }
+}
+
+/** Patch a custom task — same validation; `active:false` archives it. */
+export function updateCustomQuest(
+  state: GameState,
+  cmd: {
+    id: string
+    patch: Partial<Pick<CustomQuest, 'title' | 'coins' | 'stars' | 'childIds' | 'days' | 'active'>>
+  },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<CustomQuest> {
+  void now
+  void deps
+  const quest = state.customQuests[cmd.id]
+  if (!quest) {
+    return { state, result: err('unknown-quest', 'That task does not exist.') }
+  }
+  const p = cmd.patch
+  const clean = validateCustomQuest({
+    title: p.title ?? quest.title,
+    coins: p.coins ?? quest.coins,
+    stars: p.stars ?? quest.stars,
+    childIds: p.childIds ?? quest.childIds,
+    days: p.days ?? quest.days,
+  })
+  if (!clean.ok) {
+    return { state, result: clean }
+  }
+  const updated: CustomQuest = {
+    ...quest,
+    ...clean.value,
+    active: p.active ?? quest.active,
+  }
+  const next: GameState = {
+    ...state,
+    customQuests: { ...state.customQuests, [updated.id]: updated },
+  }
+  return { state: next, result: ok(updated) }
+}
+
 /* ---------------- reset & repair ---------------- */
 
 const INCIDENT_KINDS = new Set(['spitting', 'scattering', 'untrue', 'fighting', 'other'])
@@ -1093,6 +1317,8 @@ export const GROWN_UP_COMMANDS: ReadonlySet<Command['type']> = new Set([
   'logIncident',
   'markRepaired',
   'deleteIncident',
+  'createCustomQuest',
+  'updateCustomQuest',
 ])
 
 export function setSound(
@@ -1126,6 +1352,8 @@ export function applyCommand(
       return purchase(state, cmd, now, deps)
     case 'equip':
       return equip(state, cmd, now, deps)
+    case 'placeItem':
+      return placeItem(state, cmd, now, deps)
     case 'setWish':
       return setWish(state, cmd, now, deps)
     case 'evaluateLeagues':
@@ -1160,6 +1388,10 @@ export function applyCommand(
       return deleteIncident(state, cmd, now, deps)
     case 'acknowledgeRepair':
       return acknowledgeRepair(state, cmd, now, deps)
+    case 'createCustomQuest':
+      return createCustomQuest(state, cmd, now, deps)
+    case 'updateCustomQuest':
+      return updateCustomQuest(state, cmd, now, deps)
     default: {
       const _exhaustive: never = cmd
       void _exhaustive

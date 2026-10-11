@@ -1,7 +1,7 @@
 import { addDaysKey, localDateKey, mondayKeyOf, weekdayOf } from './week.ts'
 import { scheduleForDate } from './migrate.ts'
 import { projectById } from '../data/city.ts'
-import { weeklyDaysCount } from './commands.ts'
+import { customQuestsOn, weeklyDaysCount } from './commands.ts'
 import { DEFAULT_WEEKLY, weeklyTemplateById } from '../data/weekly.ts'
 import type { ChildId, Claim, GameState, ProjectId, RepairIncident, WeeklyBadge } from './types.ts'
 import { BONUS_SLOTS_PER_DAY } from './types.ts'
@@ -20,6 +20,8 @@ export type TodayView =
       restDay: false
       core: TodayQuest[]
       bonus: TodayQuest[]
+      /** grown-up-written custom tasks offered today */
+      custom: TodayQuest[]
       /** rewarded bonus activities still open today (pending+approved count down) */
       bonusSlotsLeft: number
       /** reading claims already logged today (journal or pending) */
@@ -61,12 +63,23 @@ export function todayQuestsFor(state: GameState, childId: ChildId, now: Date): T
   const coreDoneOrPending = todaysClaims()
     .filter((c) => c.role === 'core')
     .map((c) => c.questId)
+  // Custom tasks scheduled today, plus any that were claimed before a
+  // mid-day archive — a pending/done claim must stay visible.
+  const customIds = [
+    ...new Set([
+      ...customQuestsOn(state, childId, day).map((q) => q.id),
+      ...todaysClaims()
+        .filter((c) => c.role === 'custom')
+        .map((c) => c.questId),
+    ]),
+  ]
   // Reading is only offered again via the journal flow once its card is used —
   // extra units are logged from the card itself.
   return {
     restDay: false,
     core: coreIds.map((id) => statusOf(id)),
     bonus: bonusIds.filter((id) => !coreDoneOrPending.includes(id)).map((id) => statusOf(id)),
+    custom: customIds.map((id) => statusOf(id)),
     bonusSlotsLeft: Math.max(0, BONUS_SLOTS_PER_DAY - bonusUsed),
     readingClaims: todaysClaims('reading').map((c) => ({
       questId: c.questId,
@@ -185,9 +198,10 @@ export function leagueWeekStatus(state: GameState, childId: ChildId, now: Date):
     if (state.pausedDates[childId].includes(d)) continue
     const weekday = (weekdayOf(d) + 6) % 7
     const core = scheduleForDate(state, d)[childId].core[weekday] ?? []
-    if (core.length > 0) {
+    const custom = customQuestsOn(state, childId, d).length
+    if (core.length + custom > 0) {
       days += 1
-      opportunities += core.length
+      opportunities += core.length + custom
     }
   }
   const claims = Object.values(state.claims).filter(
@@ -196,7 +210,7 @@ export function leagueWeekStatus(state: GameState, childId: ChildId, now: Date):
       c.status === 'approved' &&
       c.activityDate >= week &&
       c.activityDate <= sunday &&
-      c.role === 'core' &&
+      (c.role === 'core' || c.role === 'custom') &&
       (c.reward?.stars ?? 0) > 0,
   )
   const count = claims.length

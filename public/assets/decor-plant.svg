@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 140">
+  <!-- hanging potted plant -->
+  <rect x="63" y="0" width="4" height="34" fill="#a06a42"/>
+  <circle cx="65" cy="36" r="6" fill="#96683f"/>
+  <!-- trailing leaves -->
+  <g fill="#58cc02">
+    <ellipse cx="34" cy="78" rx="10" ry="26" transform="rotate(24 34 78)"/>
+    <ellipse cx="96" cy="78" rx="10" ry="26" transform="rotate(-24 96 78)"/>
+    <ellipse cx="50" cy="98" rx="9" ry="22" transform="rotate(8 50 98)"/>
+    <ellipse cx="80" cy="98" rx="9" ry="22" transform="rotate(-8 80 98)"/>
+  </g>
+  <g fill="#3f9e34">
+    <ellipse cx="24" cy="96" rx="8" ry="20" transform="rotate(36 24 96)"/>
+    <ellipse cx="106" cy="96" rx="8" ry="20" transform="rotate(-36 106 96)"/>
+    <ellipse cx="65" cy="110" rx="9" ry="24"/>
+  </g>
+  <!-- pot -->
+  <path d="M40 56 h50 l-6 26 q-19 8 -38 0 z" fill="#ff9600"/>
+  <rect x="38" y="50" width="54" height="12" rx="6" fill="#e08600"/>
+</svg>

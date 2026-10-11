@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 240">
+  <!-- standing bookshelf with three shelves of books -->
+  <ellipse cx="55" cy="232" rx="50" ry="7" fill="#e0aa6b" opacity="0.55"/>
+  <rect x="8" y="8" width="94" height="222" rx="10" fill="#c98a5a"/>
+  <rect x="16" y="16" width="78" height="206" rx="6" fill="#a06a42"/>
+  <rect x="16" y="76" width="78" height="8" rx="4" fill="#c98a5a"/>
+  <rect x="16" y="146" width="78" height="8" rx="4" fill="#c98a5a"/>
+  <!-- top shelf -->
+  <rect x="22" y="44" width="12" height="32" rx="3" fill="#ff4b4b"/>
+  <rect x="37" y="40" width="10" height="36" rx="3" fill="#1cb0f6"/>
+  <rect x="50" y="48" width="11" height="28" rx="3" fill="#ffc800"/>
+  <circle cx="78" cy="62" r="13" fill="#6ddb1e"/>
+  <circle cx="78" cy="62" r="8" fill="#58cc02"/>
+  <!-- middle shelf -->
+  <rect x="22" y="112" width="11" height="34" rx="3" fill="#58cc02"/>
+  <rect x="36" y="106" width="12" height="40" rx="3" fill="#ce82ff"/>
+  <rect x="51" y="116" width="10" height="30" rx="3" fill="#ff9600"/>
+  <rect x="64" y="110" width="12" height="36" rx="3" fill="#7fd4f0"/>
+  <!-- bottom shelf: toy box + books -->
+  <rect x="22" y="188" width="12" height="34" rx="3" fill="#ffc800"/>
+  <rect x="37" y="192" width="10" height="30" rx="3" fill="#ff4b4b"/>
+  <rect x="56" y="196" width="32" height="22" rx="6" fill="#ff9600"/>
+  <rect x="62" y="200" width="20" height="8" rx="4" fill="#ffb14d"/>
+</svg>

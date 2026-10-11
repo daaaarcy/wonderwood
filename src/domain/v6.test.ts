@@ -44,7 +44,7 @@ describe('v5 → v6 migration', () => {
     delete v5.badges
     delete v5.repairs
     const s = migrateState(v5, { now: NOW, timeZone: TZ })
-    expect(s?.schemaVersion).toBe(6)
+    expect(s?.schemaVersion).toBe(7)
     expect(s?.city.name).toBeNull()
     expect(s?.city.postcards).toEqual([])
     expect(s?.weekly).toEqual({ theodore: {}, leonard: {} })

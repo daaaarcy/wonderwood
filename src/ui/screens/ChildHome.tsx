@@ -13,6 +13,7 @@ import { itemById } from '../../data/catalogue'
 import { KIT_PRICE, PROJECTS, projectById } from '../../data/city'
 import { questById, type QuestDef } from '../../data/quests'
 import { QuestCard } from '../components/QuestCard'
+import { CustomQuestCard } from '../components/CustomQuestCard'
 import { ReadingSheet } from '../components/ReadingSheet'
 import { assetUrl } from '../../game/assets'
 import { EventBus } from '../../game/EventBus'
@@ -390,6 +391,33 @@ export function ChildHome({ childId }: { childId: ChildId }) {
                     />
                   )
                 })}
+
+                {today.custom.length > 0 && (
+                  <>
+                    <p className="bonus-title custom-title">From grown-ups</p>
+                    {today.custom.map((t) => {
+                      const cq = state.customQuests[t.questId]
+                      const claimTitle = t.claimId ? state.claims[t.claimId]?.questTitle : undefined
+                      return (
+                        <CustomQuestCard
+                          key={t.questId}
+                          quest={cq}
+                          title={claimTitle}
+                          status={t.status}
+                          offline={offline}
+                          onClaim={() =>
+                            void repo.dispatch({
+                              type: 'claimQuest',
+                              childId,
+                              questId: t.questId,
+                              claimId: crypto.randomUUID(),
+                            })
+                          }
+                        />
+                      )
+                    })}
+                  </>
+                )}
 
                 {today.bonus.length > 0 && (
                   <details className="bonus-fold" open={!isSmallScreen}>

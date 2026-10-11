@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 170">
+  <!-- simple starter bed: headboard left, mattress, blanket -->
+  <rect x="14" y="18" width="26" height="140" rx="10" fill="#a06a42"/>
+  <rect x="268" y="96" width="18" height="62" rx="8" fill="#a06a42"/>
+  <rect x="20" y="118" width="262" height="26" rx="10" fill="#8a5a35"/>
+  <rect x="30" y="96" width="246" height="34" rx="12" fill="#fff3e4"/>
+  <rect x="118" y="96" width="158" height="30" rx="12" fill="#7fd4f0"/>
+  <rect x="118" y="96" width="158" height="12" rx="6" fill="#9fe0f6"/>
+  <rect x="40" y="86" width="66" height="34" rx="14" fill="#ffffff"/>
+  <ellipse cx="150" cy="158" rx="132" ry="10" fill="#e0aa6b" opacity="0.55"/>
+</svg>

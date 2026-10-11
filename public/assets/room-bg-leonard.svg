@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700">
+  <!-- wall: warm orange tint -->
+  <rect width="1000" height="700" fill="#ffdcb8"/>
+  <rect width="1000" height="120" fill="#ffedd8"/>
+  <!-- floor: warm light wood -->
+  <rect y="430" width="1000" height="270" fill="#f0bb7d"/>
+  <g stroke="#d99c58" stroke-width="4">
+    <line x1="0" y1="470" x2="1000" y2="470"/>
+    <line x1="0" y1="530" x2="1000" y2="530"/>
+    <line x1="0" y1="590" x2="1000" y2="590"/>
+    <line x1="0" y1="650" x2="1000" y2="650"/>
+  </g>
+  <!-- baseboard -->
+  <rect y="418" width="1000" height="16" fill="#d99c58"/>
+
+  <!-- pennant string: sunset palette -->
+  <path d="M60 60 q200 70 420 30 q180 -30 300 10" fill="none" stroke="#a06a42" stroke-width="3.5"/>
+  <g>
+    <path d="M140 82 l14 22 l14 -18 z" fill="#ff9600"/>
+    <path d="M230 100 l14 22 l14 -18 z" fill="#ffc800"/>
+    <path d="M320 106 l14 22 l14 -18 z" fill="#ff4b4b"/>
+    <path d="M410 104 l14 22 l14 -18 z" fill="#ef8f1a"/>
+    <path d="M560 86 l14 22 l14 -18 z" fill="#ff9600"/>
+    <path d="M650 82 l14 22 l14 -18 z" fill="#ffd98e"/>
+  </g>
+
+  <!-- round window -->
+  <circle cx="770" cy="190" r="105" fill="#a06a42"/>
+  <circle cx="770" cy="190" r="92" fill="#fff3e4"/>
+  <circle cx="770" cy="190" r="88" fill="#ffb56b"/>
+  <g>
+    <circle cx="730" cy="165" r="26" fill="#58cc02"/>
+    <circle cx="762" cy="146" r="32" fill="#6ddb1e"/>
+    <circle cx="814" cy="232" r="30" fill="#58cc02"/>
+    <ellipse cx="752" cy="252" rx="46" ry="14" fill="#ffd98e"/>
+    <circle cx="742" cy="172" r="9" fill="#fff3e4"/>
+    <ellipse cx="800" cy="150" rx="22" ry="10" fill="#ffffff" opacity="0.9"/>
+  </g>
+  <rect x="766" y="102" width="8" height="176" fill="#a06a42"/>
+  <rect x="682" y="186" width="176" height="8" fill="#a06a42"/>
+
+  <!-- framed picture: a little sun over hills -->
+  <rect x="330" y="150" width="90" height="70" rx="10" fill="#ffffff"/>
+  <rect x="330" y="150" width="90" height="70" rx="10" fill="none" stroke="#a06a42" stroke-width="7"/>
+  <path d="M342 200 l20 -24 l14 14 l16 -20 l16 30 z" fill="#ef8f1a"/>
+  <circle cx="352" cy="168" r="7" fill="#ff9600"/>
+</svg>

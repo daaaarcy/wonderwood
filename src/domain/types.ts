@@ -3,8 +3,39 @@ export type ChildId = 'theodore' | 'leonard'
 export const CHILD_IDS: ChildId[] = ['theodore', 'leonard']
 
 export type EquipSlot = 'hat' | 'toy'
+
+/** Fixed positions in a child's room where furniture can be placed. */
+export type FurnitureSpot =
+  | 'bed'
+  | 'rug'
+  | 'chair'
+  | 'desk'
+  | 'computer'
+  | 'shelf'
+  | 'lamp'
+  | 'decor-a'
+  | 'decor-b'
+
+export const FURNITURE_SPOTS: readonly FurnitureSpot[] = [
+  'bed',
+  'rug',
+  'chair',
+  'desk',
+  'computer',
+  'shelf',
+  'lamp',
+  'decor-a',
+  'decor-b',
+] as const
+
+/** Decor items fit either decor spot. */
+export const DECOR_SPOTS: readonly FurnitureSpot[] = ['decor-a', 'decor-b']
+
+/** The spot a furniture item belongs to ('decor' = either decor spot). */
+export type ItemSpot = Exclude<FurnitureSpot, 'decor-a' | 'decor-b'> | 'decor'
+
 export type ClaimStatus = 'pending' | 'approved' | 'rejected'
-export type ClaimRole = 'core' | 'bonus'
+export type ClaimRole = 'core' | 'bonus' | 'custom'
 export type DateKey = string // 'YYYY-MM-DD' in the family's time zone
 
 /** What the child actually did, for the grown-up's approval view + journal. */
@@ -30,12 +61,14 @@ export interface Claim {
   questId: string
   /** Local YYYY-MM-DD of the day the child tapped "I did it!" */
   activityDate: string
-  /** 'core' or 'bonus' — decided at claim time from that day's schedule. */
+  /** 'core', 'bonus' or 'custom' — decided at claim time from that day's schedule. */
   role: ClaimRole
   status: ClaimStatus
   claimedAt: string
   decidedAt?: string
   details?: ClaimDetails
+  /** v7: title stored on custom-quest claims so archived tasks still render. */
+  questTitle?: string
   /** The reward actually given — stamped at approval. */
   reward?: { coins: number; stars: number }
 }
@@ -62,6 +95,8 @@ export interface ChildState {
   stars: number
   inventory: string[]
   equipped: { hat: string | null; toy: string | null }
+  /** v7: furniture placed in the room — one item per spot. */
+  placed: Partial<Record<FurnitureSpot, string>>
   wishItem: string | null
   league: LeagueState
 }
@@ -156,8 +191,24 @@ export interface DaySchedule {
   bonus: string[]
 }
 
+/**
+ * v7: a task written by a grown-up. `days` holds weekdays 0=Mon..6=Sun;
+ * an empty list means "every day". `active:false` = archived — kept so
+ * history stays readable; claims store the title on themselves.
+ */
+export interface CustomQuest {
+  id: string
+  title: string
+  coins: number
+  stars: number
+  childIds: ChildId[]
+  days: number[]
+  createdAt: string
+  active: boolean
+}
+
 export interface GameState {
-  schemaVersion: 6
+  schemaVersion: 7
   /** Grown-up-editable per-child settings. */
   config: Record<ChildId, ChildConfig>
   /** Schedule history — a day uses the latest entry with effectiveFrom ≤ day. */
@@ -181,14 +232,18 @@ export interface GameState {
   badges: WeeklyBadge[]
   /** v6: grown-up repair log, keyed by incident id. */
   repairs: Record<string, RepairIncident>
+  /** v7: grown-up-written tasks, keyed by quest id. */
+  customQuests: Record<string, CustomQuest>
 }
 
 export interface CatalogItem {
   id: string
   name: string
-  slot: EquipSlot
+  slot: EquipSlot | 'furniture'
   price: number
   assetKey: string
+  /** Furniture only: which spot it belongs to ('decor' fits either). */
+  spot?: ItemSpot
 }
 
 export type Command =
@@ -198,6 +253,7 @@ export type Command =
   | { type: 'parentCompleteAndApprove'; childId: ChildId; questId: string; claimId: string; details?: ClaimDetails }
   | { type: 'purchase'; childId: ChildId; itemId: string; purchaseId: string }
   | { type: 'equip'; childId: ChildId; slot: EquipSlot; itemId: string | null }
+  | { type: 'placeItem'; childId: ChildId; spot: FurnitureSpot; itemId: string | null }
   | { type: 'setWish'; childId: ChildId; itemId: string | null }
   | { type: 'evaluateLeagues' }
   | { type: 'acknowledgePromotion'; childId: ChildId }
@@ -233,6 +289,21 @@ export type Command =
   | { type: 'markRepaired'; incidentId: string }
   | { type: 'deleteIncident'; incidentId: string }
   | { type: 'acknowledgeRepair'; incidentId: string }
+  | {
+      type: 'createCustomQuest'
+      /** caller-supplied id so a re-send is a no-op (same as claimId/purchaseId) */
+      questId: string
+      childIds: ChildId[]
+      title: string
+      coins: number
+      stars: number
+      days: number[]
+    }
+  | {
+      type: 'updateCustomQuest'
+      id: string
+      patch: Partial<Pick<CustomQuest, 'title' | 'coins' | 'stars' | 'childIds' | 'days' | 'active'>>
+    }
 
 export type DomainErrorCode =
   | 'already-claimed-today'
@@ -256,6 +327,7 @@ export type DomainErrorCode =
   | 'invalid-weekly'
   | 'unknown-incident'
   | 'incident-not-repaired'
+  | 'invalid-quest'
 
 export interface DomainError {
   code: DomainErrorCode

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 150">
+  <!-- corner desk: deeper top + side return to the right, cubby shelf -->
+  <ellipse cx="120" cy="142" rx="112" ry="8" fill="#e0aa6b" opacity="0.55"/>
+  <!-- side return -->
+  <rect x="176" y="42" width="44" height="96" rx="8" fill="#b5764a"/>
+  <rect x="176" y="42" width="44" height="12" rx="6" fill="#c98a5a"/>
+  <!-- main top -->
+  <rect x="10" y="60" width="186" height="18" rx="8" fill="#a06a42"/>
+  <rect x="10" y="58" width="186" height="10" rx="5" fill="#c98a5a"/>
+  <rect x="20" y="76" width="16" height="62" rx="6" fill="#96683f"/>
+  <rect x="150" y="76" width="16" height="62" rx="6" fill="#96683f"/>
+  <!-- cubby shelf under the left half -->
+  <rect x="42" y="80" width="100" height="40" rx="8" fill="#c98a5a"/>
+  <rect x="50" y="88" width="84" height="24" rx="5" fill="#96683f"/>
+  <rect x="56" y="92" width="14" height="20" rx="3" fill="#ff4b4b"/>
+  <rect x="73" y="92" width="12" height="20" rx="3" fill="#58cc02"/>
+  <rect x="88" y="92" width="14" height="20" rx="3" fill="#1cb0f6"/>
+  <!-- books lying on top -->
+  <rect x="30" y="46" width="52" height="10" rx="4" fill="#ce82ff"/>
+  <rect x="34" y="36" width="44" height="10" rx="4" fill="#58cc02"/>
+</svg>

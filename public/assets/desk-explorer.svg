@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 150">
+  <!-- explorer desk: top, two legs, drawer stack right, map + pencil cup -->
+  <ellipse cx="120" cy="142" rx="112" ry="8" fill="#e0aa6b" opacity="0.55"/>
+  <rect x="14" y="56" width="212" height="18" rx="8" fill="#a06a42"/>
+  <rect x="14" y="54" width="212" height="10" rx="5" fill="#c98a5a"/>
+  <rect x="26" y="72" width="16" height="66" rx="6" fill="#96683f"/>
+  <rect x="196" y="72" width="16" height="66" rx="6" fill="#96683f"/>
+  <!-- drawer stack -->
+  <rect x="140" y="74" width="66" height="64" rx="8" fill="#c98a5a"/>
+  <rect x="148" y="82" width="50" height="22" rx="6" fill="#a06a42"/>
+  <rect x="148" y="110" width="50" height="22" rx="6" fill="#a06a42"/>
+  <circle cx="173" cy="93" r="4" fill="#ffc800"/>
+  <circle cx="173" cy="121" r="4" fill="#ffc800"/>
+  <!-- little map + pencil cup on top -->
+  <rect x="40" y="40" width="58" height="18" rx="4" fill="#fff3e4" transform="rotate(-4 69 49)"/>
+  <path d="M48 50 l10 -6 8 5 10 -6" fill="none" stroke="#58cc02" stroke-width="3" stroke-linecap="round" transform="rotate(-4 69 49)"/>
+  <rect x="106" y="36" width="20" height="22" rx="5" fill="#1cb0f6"/>
+  <rect x="110" y="28" width="4" height="16" rx="2" fill="#ff4b4b"/>
+  <rect x="117" y="26" width="4" height="18" rx="2" fill="#ffc800"/>
+</svg>

@@ -454,3 +454,136 @@ test('capture the v6 screens', async ({ browser }, testInfo) => {
     await s.context.close()
   }
 })
+
+test('capture the v7 screens', async ({ browser }, testInfo) => {
+  captureOnly(testInfo.project.name)
+  mkdirSync(DIR, { recursive: true })
+  const p = testInfo.project.name
+
+  // a furnished state: Theodore's room partly decorated, custom tasks live
+  const furnished = freshState((s) => {
+    s.children.theodore.coins = 300
+    s.children.theodore.inventory.push(
+      'bed-cosy',
+      'rug-round',
+      'desk-explorer',
+      'computer-laptop',
+      'chair-beanbag',
+      'decor-rocket',
+      'decor-garland',
+    )
+    s.children.theodore.placed = {
+      bed: 'bed-cosy',
+      rug: 'rug-round',
+      desk: 'desk-explorer',
+      computer: 'computer-laptop',
+      'decor-a': 'decor-rocket',
+      'decor-b': 'decor-garland',
+    }
+    s.children.leonard.inventory.push('bed-house', 'rug-cloud', 'shelf-books', 'lamp-floor', 'decor-plant')
+    s.children.leonard.placed = {
+      bed: 'bed-house',
+      rug: 'rug-cloud',
+      shelf: 'shelf-books',
+      lamp: 'lamp-floor',
+      'decor-a': 'decor-plant',
+    }
+    s.customQuests['cq-shots'] = {
+      id: 'cq-shots',
+      title: 'Water the plants',
+      coins: 12,
+      stars: 2,
+      childIds: ['theodore', 'leonard'],
+      days: [],
+      createdAt: new Date().toISOString(),
+      active: true,
+    }
+    s.customQuests['cq-shots-2'] = {
+      id: 'cq-shots-2',
+      title: 'Help sort the recycling',
+      coins: 8,
+      stars: 1,
+      childIds: ['leonard'],
+      days: [0, 2, 4],
+      createdAt: new Date().toISOString(),
+      active: true,
+    }
+  })
+
+  // --- shop "My room" tab: grouped furniture + room-corner preview ---
+  {
+    const s = await seededPage(browser, p, seedJson(furnished))
+    await s.page.goto('/')
+    await s.page.getByRole('button', { name: 'Theodore' }).click()
+    await expect(s.page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
+    await s.page.getByRole('button', { name: 'Shop' }).click()
+    await s.page.getByTestId('tab-room').click()
+    await s.page.locator('.shop-card', { hasText: 'House-frame bed' }).click()
+    await expect(s.page.getByTestId('room-preview')).toBeVisible()
+    await shot(s.page, p, '50-shop-furniture')
+    await s.context.close()
+  }
+
+  // --- Leonard's furnished room (warm variant) ---
+  {
+    const s = await seededPage(browser, p, seedJson(furnished))
+    await s.page.goto('/')
+    await s.page.getByRole('button', { name: 'Leonard' }).click()
+    await expect(s.page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
+    await s.page.locator('.main-nav').getByRole('button', { name: 'My room' }).click()
+    await expect(s.page.locator('[data-scene="room"][data-scene-ready="true"]')).toBeAttached()
+    await s.page.waitForTimeout(700)
+    await shot(s.page, p, '51-room-leonard-furniture')
+    await s.context.close()
+  }
+
+  // --- Theodore's room + the spot picker sheet ---
+  {
+    const s = await seededPage(browser, p, seedJson(furnished))
+    await s.page.goto('/')
+    await s.page.getByRole('button', { name: 'Theodore' }).click()
+    await expect(s.page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
+    await s.page.locator('.main-nav').getByRole('button', { name: 'My room' }).click()
+    await expect(s.page.locator('[data-scene="room"][data-scene-ready="true"]')).toBeAttached()
+    await s.page.waitForTimeout(700)
+    await shot(s.page, p, '52-room-theodore-furniture')
+    await s.page.evaluate(() => {
+      ;(window as unknown as { __roomTap: (s: string) => void }).__roomTap('desk')
+    })
+    await expect(s.page.getByRole('dialog', { name: 'Desk spot' })).toBeVisible()
+    await s.page.waitForTimeout(350)
+    await shotOverlay(s.page, p, '53-room-picker')
+    await s.context.close()
+  }
+
+  // --- child home with "From grown-ups" cards ---
+  {
+    const s = await seededPage(browser, p, seedJson(furnished))
+    await s.page.goto('/')
+    await s.page.getByRole('button', { name: 'Leonard' }).click()
+    await expect(s.page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
+    await expect(s.page.getByText('From grown-ups')).toBeVisible()
+    await s.page.waitForTimeout(400)
+    await shot(s.page, p, '54-home-custom-tasks')
+    await s.context.close()
+  }
+
+  // --- grown-ups: tasks panel + the add-task form ---
+  {
+    const s = await seededPage(browser, p, seedJson(furnished))
+    await s.page.goto('/')
+    await s.page.getByRole('button', { name: 'Grown-ups' }).click()
+    await s.page.waitForSelector('.pin-key')
+    for (const d of '1234') await s.page.getByRole('button', { name: `Digit ${d}` }).click()
+    const conf = s.page.getByText('Tap the same PIN again')
+    if (await conf.isVisible().catch(() => false)) {
+      for (const d of '1234') await s.page.getByRole('button', { name: `Digit ${d}` }).click()
+    }
+    await s.page.locator('.tasks-panel').scrollIntoViewIfNeeded()
+    await shot(s.page, p, '55-grownups-tasks')
+    await s.page.locator('.tasks-panel').getByTestId('add-task').click()
+    await s.page.waitForTimeout(300)
+    await shot(s.page, p, '56-task-form')
+    await s.context.close()
+  }
+})

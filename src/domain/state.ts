@@ -30,6 +30,7 @@ function initialChild(): ChildState {
     stars: 0,
     inventory: ['toy-train'],
     equipped: { hat: null, toy: 'toy-train' },
+    placed: {},
     wishItem: null,
     league: initialLeague(),
   }
@@ -38,7 +39,7 @@ function initialChild(): ChildState {
 export function initialState(now: Date = new Date(), timeZone = 'UTC'): GameState {
   const at = now.toISOString()
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     timeZone,
     createdAt: at,
     config: structuredClone(DEFAULT_CHILD_CONFIG),
@@ -61,5 +62,6 @@ export function initialState(now: Date = new Date(), timeZone = 'UTC'): GameStat
     weekly: { theodore: {}, leonard: {} },
     badges: [],
     repairs: {},
+    customQuests: {},
   }
 }

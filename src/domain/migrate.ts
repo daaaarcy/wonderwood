@@ -6,6 +6,7 @@ import { localDateKey } from './week.ts'
 import type {
   ChildConfig,
   ChildId,
+  ChildState,
   CityState,
   Claim,
   DateKey,
@@ -19,9 +20,18 @@ import {
 
 /* ---------------- older shapes ---------------- */
 
+/** Child shape before v7 added `placed`. */
+type ChildStateV6 = Omit<ChildState, 'placed'>
+
+/** v6 shape: v7 minus custom quests and per-child placed furniture. */
+type GameStateV6 = Omit<GameState, 'schemaVersion' | 'customQuests' | 'children'> & {
+  schemaVersion: 6
+  children: Record<ChildId, ChildStateV6>
+}
+
 /** v2 shape: v3 minus the city block (v2 still had parentPinHash). */
 type GameStateV2 = Omit<
-  GameState,
+  GameStateV6,
   | 'schemaVersion'
   | 'city'
   | 'timeZone'
@@ -34,7 +44,7 @@ type GameStateV2 = Omit<
 > & {
   schemaVersion: 2
   parentPinHash?: string | null
-  claims: Record<string, Omit<Claim, 'role' | 'details' | 'reward'>>
+  claims: Record<string, Omit<Claim, 'role' | 'details' | 'reward' | 'questTitle'>>
 }
 
 type GameStateV3 = Omit<GameStateV2, 'schemaVersion'> & {
@@ -47,7 +57,7 @@ type GameStateV4 = Omit<GameStateV3, 'schemaVersion'> & {
   timeZone: string
 }
 
-type GameStateV5 = Omit<GameState, 'schemaVersion' | 'weekly' | 'badges' | 'repairs'> & {
+type GameStateV5 = Omit<GameStateV6, 'schemaVersion' | 'weekly' | 'badges' | 'repairs'> & {
   schemaVersion: 5
 }
 
@@ -110,6 +120,16 @@ function isValidV6(value: Record<string, unknown>): boolean {
   if (!isValidV5(value)) return false
   const s = value as unknown as GameState
   return isRecord(s.weekly) && Array.isArray(s.badges) && isRecord(s.repairs)
+}
+
+function isValidV7(value: Record<string, unknown>): boolean {
+  if (!isValidV6(value)) return false
+  const s = value as unknown as GameState
+  if (!isRecord(s.customQuests)) return false
+  for (const id of ['theodore', 'leonard'] as const) {
+    if (!isRecord(s.children[id].placed)) return false
+  }
+  return true
 }
 
 /* ---------------- chain ---------------- */
@@ -185,8 +205,21 @@ export const DEFAULT_CHILD_CONFIG: Record<ChildId, ChildConfig> = {
   },
 }
 
+/** v6 → v7: placed furniture (empty room per child) + grown-up custom quests. */
+function migrateV6(v6: GameStateV6): GameState {
+  return {
+    ...v6,
+    schemaVersion: 7,
+    children: {
+      theodore: { ...v6.children.theodore, placed: {} },
+      leonard: { ...v6.children.leonard, placed: {} },
+    },
+    customQuests: {},
+  }
+}
+
 /** v5 → v6: city naming/postcards, weekly challenges, repair log. */
-function migrateV5(v5: GameStateV5): GameState {
+function migrateV5(v5: GameStateV5): GameStateV6 {
   return {
     ...v5,
     schemaVersion: 6,
@@ -247,20 +280,24 @@ export function migrateState(raw: unknown, ctx: MigrateCtx): GameState | null {
     } else if (version === 2) {
       v2 = isValidV2(value) ? (value as unknown as GameStateV2) : null
     }
-    if (v2) return migrateV5(migrateV4(migrateV3(migrateV2(v2), ctx.timeZone), ctx))
+    if (v2) return migrateV6(migrateV5(migrateV4(migrateV3(migrateV2(v2), ctx.timeZone), ctx)))
     if (version === 3) {
       const v3 = isValidV3(value) ? (value as unknown as GameStateV3) : null
-      return v3 ? migrateV5(migrateV4(migrateV3(v3, ctx.timeZone), ctx)) : null
+      return v3 ? migrateV6(migrateV5(migrateV4(migrateV3(v3, ctx.timeZone), ctx))) : null
     }
     if (version === 4) {
       const v4 = isValidV4(value) ? (value as unknown as GameStateV4) : null
-      return v4 ? migrateV5(migrateV4(v4, ctx)) : null
+      return v4 ? migrateV6(migrateV5(migrateV4(v4, ctx))) : null
     }
     if (version === 5) {
       const v5 = isValidV5(value) ? (value as unknown as GameStateV5) : null
-      return v5 ? migrateV5(v5) : null
+      return v5 ? migrateV6(migrateV5(v5)) : null
     }
-    if (version === 6) return isValidV6(value) ? (value as unknown as GameState) : null
+    if (version === 6) {
+      const v6 = isValidV6(value) ? (value as unknown as GameStateV6) : null
+      return v6 ? migrateV6(v6) : null
+    }
+    if (version === 7) return isValidV7(value) ? (value as unknown as GameState) : null
     return null
   } catch {
     return null

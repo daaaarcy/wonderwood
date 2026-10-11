@@ -56,7 +56,7 @@ try {
   const hid = ch.data?.householdId
   created.households.push(hid)
   check('createHousehold', !!hid)
-  check('household state is v6 + tz', ch.data?.state?.schemaVersion === 6 && ch.data?.state?.timeZone === 'America/Los_Angeles')
+  check('household state is v7 + tz', ch.data?.state?.schemaVersion === 7 && ch.data?.state?.timeZone === 'America/Los_Angeles')
 
   // anonymous cannot createHousehold
   mark('stranger anon'); const { error: ae } = await stranger.auth.signInAnonymously()
@@ -184,6 +184,30 @@ try {
   // child-allowed: nameCity without PIN
   const nc = await fn(kid, { action: 'command', householdId: hid, command: { type: 'nameCity', childId: 'theodore', name: 'Sunny Town' } })
   check('nameCity is child-allowed (no PIN)', nc.data?.result?.ok === true)
+
+  // --- v7: custom tasks need PIN to write; placeItem is child-allowed ---
+  mark('v7 custom tasks')
+  const cqId = `cq-${Date.now()}`
+  const cqCmd = { type: 'createCustomQuest', questId: cqId, title: 'Smoke task', coins: 7, stars: 1, childIds: ['theodore'], days: [] }
+  const noPinCq = await fn(grown, { action: 'command', householdId: hid, command: cqCmd })
+  check('createCustomQuest without PIN rejected', noPinCq.error !== null || noPinCq.data?.error != null)
+  const pinCq = await fn(grown, { action: 'command', householdId: hid, pin: '1234', command: cqCmd })
+  check('createCustomQuest with PIN ok', pinCq.data?.result?.ok === true)
+  const noPinUp = await fn(grown, { action: 'command', householdId: hid, command: { type: 'updateCustomQuest', id: cqId, patch: { coins: 9 } } })
+  check('updateCustomQuest without PIN rejected', noPinUp.error !== null || noPinUp.data?.error != null)
+  // unassigned sibling cannot claim it; assigned child can
+  const wrongKid = await fn(kid, { action: 'command', householdId: hid, command: { type: 'claimQuest', childId: 'leonard', questId: cqId, claimId: `cq-bad-${Date.now()}` } })
+  check('unassigned child claim rejected', wrongKid.data?.result?.ok === false)
+  const cqClaim = await fn(kid, { action: 'command', householdId: hid, command: { type: 'claimQuest', childId: 'theodore', questId: cqId, claimId: `cq-ok-${Date.now()}` } })
+  check('assigned child custom claim ok', cqClaim.data?.result?.ok === true && cqClaim.data?.result?.value?.role === 'custom')
+  const cqClaimId = cqClaim.data?.result?.value?.id
+  const theoBefore = cqClaim.data?.state?.children?.theodore?.coins ?? 0
+  const cqApprove = await fn(grown, { action: 'command', householdId: hid, pin: '1234', command: { type: 'approveClaim', claimId: cqClaimId } })
+  const theoAfter = cqApprove.data?.state?.children?.theodore?.coins ?? -1
+  check('custom approval pays configured reward', theoAfter === theoBefore + 7 && cqApprove.data?.state?.claims?.[cqClaimId]?.questTitle === 'Smoke task', `coins ${theoBefore}→${theoAfter}`)
+  // placeItem needs no PIN (child room decorating)
+  const place = await fn(kid, { action: 'command', householdId: hid, command: { type: 'placeItem', childId: 'theodore', spot: 'rug', itemId: null } })
+  check('placeItem is child-allowed (no PIN)', place.data?.result?.ok === true)
 
   // --- RLS: stranger cannot read the household; publishable cannot read secrets ---
   const { data: rls } = await stranger.from('households').select('id').eq('id', hid)

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 130">
+  <!-- little wooden chair, three-quarter view -->
+  <ellipse cx="65" cy="120" rx="46" ry="8" fill="#e0aa6b" opacity="0.55"/>
+  <rect x="34" y="12" width="12" height="76" rx="6" fill="#a06a42"/>
+  <rect x="82" y="12" width="12" height="76" rx="6" fill="#a06a42"/>
+  <rect x="34" y="18" width="60" height="16" rx="8" fill="#c98a5a"/>
+  <rect x="34" y="42" width="60" height="12" rx="6" fill="#c98a5a"/>
+  <rect x="24" y="66" width="82" height="20" rx="9" fill="#c98a5a"/>
+  <rect x="28" y="68" width="74" height="8" rx="4" fill="#dfa06c"/>
+  <rect x="30" y="84" width="12" height="36" rx="5" fill="#a06a42"/>
+  <rect x="88" y="84" width="12" height="36" rx="5" fill="#a06a42"/>
+</svg>

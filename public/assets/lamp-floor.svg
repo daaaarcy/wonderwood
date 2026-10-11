@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 240">
+  <!-- tall floor lamp with a warm glow -->
+  <ellipse cx="45" cy="232" rx="38" ry="7" fill="#e0aa6b" opacity="0.55"/>
+  <ellipse cx="45" cy="228" rx="26" ry="7" fill="#96683f"/>
+  <rect x="41" y="70" width="8" height="160" rx="4" fill="#a06a42"/>
+  <!-- shade -->
+  <path d="M45 16 L73 62 q-28 10 -56 0 z" fill="#ffc800"/>
+  <path d="M45 16 L60 62 q-15 3 -30 1 z" fill="#ffe066" opacity="0.9"/>
+  <ellipse cx="45" cy="62" rx="28" ry="6" fill="#ffb700"/>
+  <!-- glow -->
+  <circle cx="45" cy="50" r="34" fill="#fff3b8" opacity="0.35"/>
+</svg>

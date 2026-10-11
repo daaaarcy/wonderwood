@@ -44,34 +44,4 @@
   <rect x="330" y="150" width="90" height="70" rx="10" fill="none" stroke="#96683f" stroke-width="7"/>
   <path d="M342 200 l20 -24 l14 14 l16 -20 l16 30 z" fill="#58cc02"/>
   <circle cx="352" cy="168" r="7" fill="#ffc800"/>
-
-  <!-- shelf with books -->
-  <rect x="90" y="270" width="200" height="14" rx="7" fill="#c98a5a"/>
-  <rect x="90" y="278" width="200" height="6" rx="3" fill="#a06a42"/>
-  <g>
-    <rect x="100" y="230" width="16" height="40" rx="4" fill="#ff4b4b"/>
-    <rect x="120" y="226" width="14" height="44" rx="4" fill="#1cb0f6"/>
-    <rect x="138" y="222" width="16" height="48" rx="4" fill="#ffc800"/>
-    <rect x="158" y="234" width="12" height="36" rx="4" fill="#ce82ff"/>
-    <rect x="174" y="228" width="14" height="42" rx="4" fill="#58cc02"/>
-    <circle cx="220" cy="248" r="18" fill="#6ddb1e"/>
-    <circle cx="220" cy="248" r="11" fill="#58cc02"/>
-  </g>
-
-  <!-- toy chest -->
-  <g>
-    <rect x="84" y="520" width="166" height="72" rx="14" fill="#ff9600"/>
-    <rect x="84" y="520" width="166" height="72" rx="14" fill="none" stroke="#e08600" stroke-width="4"/>
-    <rect x="88" y="508" width="166" height="34" rx="14" fill="#ffb14d"/>
-    <rect x="88" y="508" width="166" height="34" rx="14" fill="none" stroke="#e08600" stroke-width="4"/>
-    <rect x="158" y="540" width="24" height="22" rx="6" fill="#ffc800"/>
-  </g>
-
-  <!-- rug: sits inside the train-track oval (track is drawn by Phaser above it) -->
-  <ellipse cx="620" cy="596" rx="160" ry="36" fill="#ffc800"/>
-  <ellipse cx="620" cy="596" rx="128" ry="27" fill="#ffe066"/>
-  <g fill="#58cc02">
-    <ellipse cx="560" cy="596" rx="11" ry="6"/><ellipse cx="620" cy="593" rx="11" ry="6"/>
-    <ellipse cx="680" cy="596" rx="11" ry="6"/>
-  </g>
 </svg>

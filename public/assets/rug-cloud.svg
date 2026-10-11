@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120">
+  <!-- fluffy cloud-shaped rug -->
+  <g fill="#ffffff">
+    <ellipse cx="180" cy="66" rx="168" ry="46"/>
+    <circle cx="92" cy="58" r="38"/>
+    <circle cx="160" cy="44" r="44"/>
+    <circle cx="236" cy="46" r="42"/>
+    <circle cx="292" cy="64" r="34"/>
+  </g>
+  <g fill="#eafbff">
+    <circle cx="96" cy="68" r="28"/>
+    <circle cx="162" cy="56" r="32"/>
+    <circle cx="238" cy="58" r="30"/>
+    <ellipse cx="180" cy="78" rx="140" ry="30"/>
+  </g>
+  <g fill="#bfe6f5">
+    <ellipse cx="120" cy="82" rx="12" ry="6"/>
+    <ellipse cx="200" cy="86" rx="14" ry="6"/>
+    <ellipse cx="262" cy="80" rx="12" ry="6"/>
+  </g>
+</svg>

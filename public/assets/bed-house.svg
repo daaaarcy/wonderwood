@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 170">
+  <!-- house-frame bed: wooden posts + pitched roof frame over mattress -->
+  <rect x="22" y="40" width="14" height="118" rx="6" fill="#a06a42"/>
+  <rect x="258" y="40" width="14" height="118" rx="6" fill="#a06a42"/>
+  <path d="M29 44 L147 6 L265 44" fill="none" stroke="#c98a5a" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M42 64 L147 34 L252 64" fill="none" stroke="#c98a5a" stroke-width="9" stroke-linecap="round"/>
+  <rect x="26" y="112" width="246" height="32" rx="11" fill="#a06a42"/>
+  <rect x="38" y="90" width="228" height="36" rx="13" fill="#fff3e4"/>
+  <rect x="116" y="90" width="150" height="32" rx="13" fill="#ce82ff"/>
+  <rect x="116" y="90" width="150" height="10" rx="5" fill="#ddb0f2"/>
+  <rect x="46" y="80" width="64" height="34" rx="14" fill="#ffffff"/>
+  <ellipse cx="150" cy="162" rx="128" ry="8" fill="#e0aa6b" opacity="0.55"/>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 130">
+  <!-- squishy beanbag -->
+  <ellipse cx="65" cy="116" rx="54" ry="10" fill="#e0aa6b" opacity="0.55"/>
+  <path d="M15 78 q-6 -40 34 -56 q30 -12 56 6 q26 18 18 56 q-6 30 -56 30 q-44 0 -51 -36 z" fill="#9a6fe0"/>
+  <path d="M30 72 q-8 -30 24 -44 q22 -10 42 4 q-30 6 -44 24 q-12 16 -8 40 q-10 -8 -14 -24 z" fill="#b38df0"/>
+  <ellipse cx="58" cy="98" rx="30" ry="12" fill="#ce82ff"/>
+</svg>
