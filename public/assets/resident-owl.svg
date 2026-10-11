@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90">
+  <ellipse cx="60" cy="86" rx="34" ry="4" fill="#3c3c3c" opacity="0.08"/>
+  <!-- wing hints -->
+  <ellipse cx="30" cy="56" rx="10" ry="16" fill="#8a5a2e"/>
+  <ellipse cx="90" cy="56" rx="10" ry="16" fill="#8a5a2e"/>
+  <!-- body -->
+  <ellipse cx="60" cy="54" rx="30" ry="30" fill="#a9713c"/>
+  <ellipse cx="60" cy="62" rx="20" ry="20" fill="#e8d0a8"/>
+  <path d="M48 66 q4 6 8 0 q4 6 8 0 q4 6 8 0" fill="none" stroke="#c9a06a" stroke-width="3" stroke-linecap="round"/>
+  <!-- ear tufts -->
+  <path d="M38 30 L34 12 L50 22 Z" fill="#a9713c"/>
+  <path d="M82 30 L86 12 L70 22 Z" fill="#a9713c"/>
+  <!-- face -->
+  <circle cx="48" cy="38" r="14" fill="#f7f7f7"/>
+  <circle cx="72" cy="38" r="14" fill="#f7f7f7"/>
+  <circle cx="48" cy="38" r="6" fill="#3c3c3c"/>
+  <circle cx="72" cy="38" r="6" fill="#3c3c3c"/>
+  <circle cx="50" cy="36" r="2" fill="#ffffff"/>
+  <circle cx="74" cy="36" r="2" fill="#ffffff"/>
+  <path d="M56 46 L60 52 L64 46 Z" fill="#ffc800"/>
+  <!-- feet -->
+  <rect x="48" y="80" width="8" height="6" rx="3" fill="#e08600"/>
+  <rect x="64" y="80" width="8" height="6" rx="3" fill="#e08600"/>
+</svg>

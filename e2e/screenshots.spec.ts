@@ -173,7 +173,9 @@ test('league screen: weekly leaderboard with storybook friends', async ({ browse
   await page.getByRole('button', { name: 'Theodore' }).click()
   await expect(page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
   await page.getByRole('button', { name: 'League', exact: true }).click()
-  await expect(page.locator('.board-row')).toHaveCount(10) // this week + last week
+  await expect(
+    page.locator('section[aria-label="This week\'s leaderboard"] .board-row'),
+  ).toHaveCount(12) // 2 explorers + 10 storybook friends
   await page.locator('.league-how summary').click() // open the explainer for the shot
   await shot(page, p, '50-league-friends')
   await context.close()

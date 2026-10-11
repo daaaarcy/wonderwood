@@ -11,8 +11,10 @@
 import { addDaysKey, diffDays } from './week.ts'
 import { MAX_LEAGUE_RANK } from './types.ts'
 
-export type NpcId = 'felix' | 'riley' | 'bramble'
-export type NpcTemperament = 'keen' | 'steady' | 'sleepy'
+export type NpcId =
+  | 'felix' | 'riley' | 'bramble'
+  | 'olive' | 'pip' | 'hazel' | 'sunny' | 'tilly' | 'poppy' | 'dot'
+export type NpcTemperament = 'keen' | 'steady' | 'sleepy' | 'eager' | 'bouncy' | 'easygoing'
 
 export interface NpcDef {
   id: NpcId
@@ -56,6 +58,62 @@ export const NPCS: NpcDef[] = [
     assetKey: 'resident-bear',
     weeklyOpportunities: 14,
     temperament: 'sleepy',
+    baseRank: 2,
+  },
+  {
+    id: 'olive',
+    name: 'Olive the Owl',
+    assetKey: 'resident-owl',
+    weeklyOpportunities: 21,
+    temperament: 'keen',
+    baseRank: 5,
+  },
+  {
+    id: 'pip',
+    name: 'Pip the Penguin',
+    assetKey: 'resident-penguin',
+    weeklyOpportunities: 21,
+    temperament: 'eager',
+    baseRank: 3,
+  },
+  {
+    id: 'hazel',
+    name: 'Hazel the Hedgehog',
+    assetKey: 'resident-hedgehog',
+    weeklyOpportunities: 21,
+    temperament: 'steady',
+    baseRank: 2,
+  },
+  {
+    id: 'sunny',
+    name: 'Sunny the Squirrel',
+    assetKey: 'resident-squirrel',
+    weeklyOpportunities: 21,
+    temperament: 'bouncy',
+    baseRank: 1,
+  },
+  {
+    id: 'tilly',
+    name: 'Tilly the Turtle',
+    assetKey: 'resident-turtle',
+    weeklyOpportunities: 21,
+    temperament: 'easygoing',
+    baseRank: 1,
+  },
+  {
+    id: 'poppy',
+    name: 'Poppy the Panda',
+    assetKey: 'resident-panda',
+    weeklyOpportunities: 21,
+    temperament: 'sleepy',
+    baseRank: 1,
+  },
+  {
+    id: 'dot',
+    name: 'Dot the Duck',
+    assetKey: 'resident-duck',
+    weeklyOpportunities: 21,
+    temperament: 'steady',
     baseRank: 2,
   },
 ]
@@ -108,6 +166,12 @@ const TRAITS: Record<NpcTemperament, Traits> = {
   steady: { frac: 0.64, jitter: 0.14, dayFrac: 0.67, dayJitter: 0.08 },
   // sleepy Bramble: about two-fifths of quests on a few slow days
   sleepy: { frac: 0.44, jitter: 0.12, dayFrac: 0.43, dayJitter: 0.08 },
+  // eager Pip: nearly everything, nearly every day — the pipsqueak try-hard
+  eager: { frac: 0.93, jitter: 0.08, dayFrac: 0.95, dayJitter: 0.05 },
+  // bouncy Sunny: great weeks and quiet weeks — hard to predict
+  bouncy: { frac: 0.66, jitter: 0.3, dayFrac: 0.7, dayJitter: 0.2 },
+  // easygoing Tilly: a little every day, slow and steady
+  easygoing: { frac: 0.55, jitter: 0.06, dayFrac: 0.86, dayJitter: 0.05 },
 }
 
 /** Scheduled quests per day — the weekly total spread evenly over 7 days. */
@@ -179,6 +243,32 @@ function npcWeekPlan(npc: NpcDef, weekKey: string): number[] {
   }
 
   return [0, 1, 2, 3, 4, 5, 6].map((d) => counts.get(d) ?? 0)
+}
+
+/** Quests a friend finished on one day of `weekKey` (0 = a quiet day). */
+export function npcDayCount(id: NpcId, weekKey: string, dateKey: string): number {
+  const npc = npcById(id)
+  if (!npc) return 0
+  const d = diffDays(weekKey, dateKey)
+  if (d < 0 || d > 6) return 0
+  return npcWeekPlan(npc, weekKey)[d]
+}
+
+/**
+ * Consecutive days (ending `dateKey`) on which the friend finished at least
+ * one quest — can reach back into the previous week's plan.
+ */
+export function npcDayStreak(id: NpcId, weekKey: string, dateKey: string): number {
+  let streak = 0
+  let day = dateKey
+  let week = weekKey
+  for (let guard = 0; guard < 14; guard += 1) {
+    if (npcDayCount(id, week, day) <= 0) break
+    streak += 1
+    day = addDaysKey(day, -1)
+    if (day < week) week = addDaysKey(week, -7)
+  }
+  return streak
 }
 
 export interface NpcWeekProgress {

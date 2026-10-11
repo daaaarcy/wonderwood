@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { NPCS, NPC_BASE_WEEK, npcLeagueRank, npcWeekProgress, type NpcId } from './npcs.ts'
-import { childWeekScore, weeklyLeaderboard } from './selectors.ts'
+import { childWeekScore, rivalNudge, weeklyLeaderboard } from './selectors.ts'
 import { initialState } from './state.ts'
 import { approveClaim, claimQuest } from './commands.ts'
 import { addDaysKey } from './week.ts'
-import type { CommandDeps, GameState } from './types.ts'
+import type { Claim, CommandDeps, GameState } from './types.ts'
 import { commandDeps } from '../data/registry.ts'
 
 const deps: CommandDeps = commandDeps
@@ -118,16 +118,42 @@ describe('storybook friends — league rank simulation', () => {
     // Bramble's weeks never reach 70% → no promotions at all
     expect(npcLeagueRank('bramble', addDaysKey(NPC_BASE_WEEK, 52 * 7))).toBe(2)
   })
+
+  it('52 seeded weeks: median finishing pct lands mid-table, ranks never drop ≤14', () => {
+    const pcts: number[] = []
+    for (let i = 0; i < 52; i += 1) {
+      const week = addDaysKey(NPC_BASE_WEEK, i * 7)
+      for (const npc of NPCS) {
+        const p = npcWeekProgress(npc.id, week, addDaysKey(week, 6))
+        pcts.push(p.completed / p.opportunities)
+        const rank = npcLeagueRank(npc.id, week)
+        expect(rank).toBeGreaterThanOrEqual(npc.baseRank)
+        expect(rank).toBeLessThanOrEqual(14)
+      }
+      // ranks must be non-decreasing week over week per friend
+      for (const npc of NPCS) {
+        if (i > 0) {
+          expect(npcLeagueRank(npc.id, week)).toBeGreaterThanOrEqual(
+            npcLeagueRank(npc.id, addDaysKey(week, -7)),
+          )
+        }
+      }
+    }
+    pcts.sort((a, b) => a - b)
+    const median = pcts[Math.floor(pcts.length / 2)]
+    expect(median).toBeGreaterThanOrEqual(0.55)
+    expect(median).toBeLessThanOrEqual(0.8)
+  })
 })
 
 describe('weeklyLeaderboard', () => {
   const MONDAY = '2026-10-12'
   const WEDNESDAY = '2026-10-14'
 
-  it('lists both explorers and all three friends, sorted by pct', () => {
+  it('lists both explorers and all ten friends, sorted by pct', () => {
     const s = initialState(new Date(`${MONDAY}T09:00:00Z`))
     const board = weeklyLeaderboard(s, MONDAY, WEDNESDAY)
-    expect(board).toHaveLength(5)
+    expect(board).toHaveLength(12)
     expect(board.map((r) => r.name)).toEqual(
       expect.arrayContaining([
         'Theodore',
@@ -135,9 +161,16 @@ describe('weeklyLeaderboard', () => {
         'Felix the Fox',
         'Riley the Rabbit',
         'Bramble the Bear',
+        'Olive the Owl',
+        'Pip the Penguin',
+        'Hazel the Hedgehog',
+        'Sunny the Squirrel',
+        'Tilly the Turtle',
+        'Poppy the Panda',
+        'Dot the Duck',
       ]),
     )
-    expect(board.filter((r) => r.kind === 'npc')).toHaveLength(3)
+    expect(board.filter((r) => r.kind === 'npc')).toHaveLength(10)
     for (let i = 1; i < board.length; i += 1) {
       expect(board[i].pct).toBeLessThanOrEqual(board[i - 1].pct)
       // positions are non-decreasing down the sorted list
@@ -198,6 +231,105 @@ describe('weeklyLeaderboard', () => {
     // nothing scheduled → 0% rather than NaN
     const empty = initialState(new Date(`${MONDAY}T09:00:00Z`))
     expect(childWeekScore(empty, 'leonard', addDaysKey(MONDAY, -7), MONDAY).pct).toBe(0)
+  })
+
+  it('rival nudge names the nearest storybook friend — never the brother', () => {
+    // both boys at 0% on Wednesday: sort falls to name order, so Leonard's
+    // row sits directly above Theodore's at the bottom of the board
+    const s = initialState(new Date(`${MONDAY}T09:00:00Z`))
+    const board = weeklyLeaderboard(s, MONDAY, WEDNESDAY)
+    const me = board.find((r) => r.id === 'theodore')!
+    const above = board[board.indexOf(me) - 1]
+    expect(above.id).toBe('leonard') // sanity: sibling is directly above
+
+    const nudge = rivalNudge(board, 'theodore')
+    expect(nudge).not.toContain('Leonard')
+    expect(nudge).not.toContain('leading')
+    expect(nudge).toMatch(/pass|catch up/)
+    // the named friend is the nearest NPC above Theodore
+    const friendAbove = board
+      .slice(0, board.indexOf(me))
+      .reverse()
+      .find((r) => r.kind === 'npc')!
+    expect(nudge).toContain(friendAbove.name)
+    // a child in first place gets the leading copy
+    const top = board[0]
+    if (top.kind === 'child') {
+      expect(rivalNudge(board, top.id as 'theodore' | 'leonard')).toMatch(/leading/)
+    }
+  })
+
+  it('claims only count on eligible days where the quest was scheduled', () => {
+    // inject claims directly — the UI can't make these, but synced/imported
+    // data can (and the QA seed did: 8 identical claims → 8/3 = 267%)
+    const base = initialState(new Date(`${MONDAY}T09:00:00Z`))
+    const claim = (id: string, questId: string, day: string, role: 'core' | 'custom' = 'core'): Claim => ({
+      id,
+      childId: 'theodore',
+      questId,
+      role,
+      status: 'approved',
+      claimedAt: `${day}T10:00:00Z`,
+      decidedAt: `${day}T10:30:00Z`,
+      activityDate: day,
+      reward: { coins: 10, stars: 1 },
+    })
+
+    // duplicate approvals of the same quest+day count once
+    let s: GameState = {
+      ...base,
+      claims: {
+        a: claim('a', 'spanish', MONDAY),
+        b: claim('b', 'spanish', MONDAY),
+        c: claim('c', 'spanish', MONDAY),
+      },
+    }
+    const once = childWeekScore(s, 'theodore', MONDAY, MONDAY)
+    expect(once.completed).toBe(1)
+    expect(once.completed).toBeLessThanOrEqual(once.opportunities)
+
+    // a claim on a paused day doesn't count
+    s = {
+      ...base,
+      pausedDates: { ...base.pausedDates, theodore: [WEDNESDAY] },
+      claims: {
+        a: claim('a', 'spanish', MONDAY),
+        b: claim('b', 'typing', WEDNESDAY),
+      },
+    }
+    const paused = childWeekScore(s, 'theodore', MONDAY, WEDNESDAY)
+    expect(paused.completed).toBe(1)
+    expect(paused.pct).toBeLessThanOrEqual(1)
+
+    // a claim for a quest not on that day's schedule doesn't count
+    s = {
+      ...base,
+      claims: {
+        a: claim('a', 'spanish', MONDAY),
+        b: claim('b', 'violin', MONDAY), // violin isn't on Theodore's Monday core
+      },
+    }
+    const unscheduled = childWeekScore(s, 'theodore', MONDAY, MONDAY)
+    expect(unscheduled.completed).toBe(1)
+
+    // an archived custom quest's approval doesn't count
+    const customQuest = {
+      id: 'cq-x',
+      title: 'Chore',
+      iconKey: 'icon-kindness',
+      coins: 5,
+      stars: 1,
+      childIds: ['theodore' as const],
+      days: [],
+      active: false,
+      createdAt: `${MONDAY}T08:00:00Z`,
+    }
+    s = {
+      ...base,
+      customQuests: { 'cq-x': customQuest },
+      claims: { a: claim('a', 'cq-x', MONDAY, 'custom') },
+    }
+    expect(childWeekScore(s, 'theodore', MONDAY, MONDAY).completed).toBe(0)
   })
 
   it('last week standings use the finished week', () => {

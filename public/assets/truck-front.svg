@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140">
+  <!-- delivery truck, 3/4 front view driving toward the viewer -->
+  <!-- cargo box behind, peeking left -->
+  <rect x="4" y="20" width="52" height="74" rx="10" fill="#f7f7f7"/>
+  <rect x="4" y="20" width="52" height="74" rx="10" fill="none" stroke="#e2e2e2" stroke-width="4"/>
+  <rect x="10" y="28" width="40" height="9" rx="4" fill="#eef5fb"/>
+  <!-- cab front -->
+  <path d="M48 96 L48 40 Q48 30 58 30 L112 30 Q124 30 128 42 L134 64 Q136 76 136 96 Z" fill="#1cb0f6"/>
+  <!-- big windshield -->
+  <path d="M58 40 L108 40 Q117 40 120 48 L124 62 L58 62 Z" fill="#c8ecff"/>
+  <!-- driver -->
+  <circle cx="88" cy="50" r="6" fill="#7a4f33"/>
+  <!-- grill + headlights -->
+  <rect x="56" y="66" width="60" height="8" rx="4" fill="#1899d6"/>
+  <circle cx="60" cy="80" r="7" fill="#ffc800"/>
+  <circle cx="122" cy="80" r="7" fill="#ffc800"/>
+  <!-- bumper -->
+  <rect x="48" y="92" width="88" height="14" rx="6" fill="#9fb4c4"/>
+  <!-- wheels -->
+  <circle cx="66" cy="108" r="17" fill="#3c3c3c"/>
+  <circle cx="66" cy="108" r="8" fill="#9fb4c4"/>
+  <circle cx="118" cy="108" r="17" fill="#3c3c3c"/>
+  <circle cx="118" cy="108" r="8" fill="#9fb4c4"/>
+</svg>

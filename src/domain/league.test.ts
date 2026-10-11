@@ -47,6 +47,47 @@ function eval_(s: GameState, now: Date) {
 }
 
 describe('league promotion rule', () => {
+  it('inflated claims (dupes, paused days, unscheduled) do NOT promote', () => {
+    // 20 approved-looking claims but only 8 legit ones — dupes of the same
+    // quest+day, a paused day, and an unscheduled quest must not count
+    let s = initialState(new Date('2026-09-01T08:00:00Z'))
+    const mk = (id: string, questId: string, day: string) => ({
+      id,
+      childId: 'theodore' as const,
+      questId,
+      role: 'core' as const,
+      status: 'approved' as const,
+      claimedAt: `${day}T10:00:00Z`,
+      decidedAt: `${day}T10:30:00Z`,
+      activityDate: day,
+      reward: { coins: 10, stars: 1 },
+    })
+    const claims: Record<string, ReturnType<typeof mk>> = {}
+    // 4 legit quests/day × 2 days = 8 (Mon+Tue of W0)
+    let n = 0
+    for (const day of [MONDAY_W0, '2026-09-08']) {
+      for (const q of (DEFAULT_SCHEDULE.theodore.core[0] ?? []).slice(0, 4)) {
+        claims[`x${n}`] = mk(`x${n}`, q, day)
+        n += 1
+      }
+    }
+    // 8 duplicate approvals of spanish on the same day — count once
+    for (let i = 0; i < 8; i += 1) claims[`dup${i}`] = mk(`dup${i}`, 'spanish', MONDAY_W0)
+    // 3 claims on the paused Wednesday — don't count
+    for (let i = 0; i < 3; i += 1) claims[`pa${i}`] = mk(`pa${i}`, 'typing', '2026-09-09')
+    // 1 claim for a quest not scheduled that day — doesn't count
+    claims['unsched'] = mk('unsched', 'violin', MONDAY_W0)
+    s = {
+      ...s,
+      claims,
+      pausedDates: { ...s.pausedDates, theodore: ['2026-09-09'] },
+    }
+    s = eval_(s, NOW_W1)
+    // only 8 of ~21 counted → well under the 15 target → no promotion
+    expect(s.children.theodore.league.rank).toBe(1)
+    expect(s.children.theodore.league.evaluatedWeeks[MONDAY_W0]).toEqual({ promoted: false })
+  })
+
   it('15 of 21 (exactly 70% threshold, ≥3 days) promotes one league', () => {
     // createdAt before the week → full 7 eligible days → target ceil(0.7*21)=15
     let s = initialState(new Date('2026-09-01T08:00:00Z'))

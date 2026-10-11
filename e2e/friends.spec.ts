@@ -18,13 +18,13 @@ test.beforeEach(async ({ page }) => {
   }, seedJson(boardSeed()))
 })
 
-test('leaderboard: one sorted list of 5 rows mixing family + storybook friends', async ({
+test('leaderboard: one sorted list of 12 rows mixing family + storybook friends', async ({
   page,
 }) => {
   await openLeague(page)
   const board = thisWeek(page)
-  await expect(board.locator('.board-row')).toHaveCount(5)
-  await expect(board.locator('.board-friend')).toHaveCount(3)
+  await expect(board.locator('.board-row')).toHaveCount(12)
+  await expect(board.locator('.board-friend')).toHaveCount(10)
   await expect(board.getByText('Keep going, explorers!')).toBeVisible()
   await expect(board.getByText(/pretend friends/)).toBeVisible()
 
@@ -33,28 +33,41 @@ test('leaderboard: one sorted list of 5 rows mixing family + storybook friends',
     ['Felix the Fox', 'resident-fox'],
     ['Riley the Rabbit', 'resident-rabbit'],
     ['Bramble the Bear', 'resident-bear'],
+    ['Olive the Owl', 'resident-owl'],
+    ['Pip the Penguin', 'resident-penguin'],
+    ['Hazel the Hedgehog', 'resident-hedgehog'],
+    ['Sunny the Squirrel', 'resident-squirrel'],
+    ['Tilly the Turtle', 'resident-turtle'],
+    ['Poppy the Panda', 'resident-panda'],
+    ['Dot the Duck', 'resident-duck'],
   ] as const) {
     const row = board.locator('.board-row', { hasText: name })
-    await expect(row.locator('.tag-friend')).toContainText('Storybook friend')
+    await expect(row.locator('.paw-badge')).toHaveAttribute('aria-label', 'Storybook friend')
     await expect(row.locator('img.board-avatar')).toHaveAttribute(
       'src',
       new RegExp(`${asset}\\.svg`),
     )
     await expect(row.locator('svg.league-badge')).toHaveCount(1)
-    await expect(row.locator('.board-score')).toContainText(/of \d+ quests/)
+    await expect(row.locator('.board-score')).toHaveAttribute('aria-label', /of \d+ quests/)
   }
 
   // both boys are in the same list, with badges
   for (const name of ['Theodore', 'Leonard']) {
     const row = board.locator('.board-row', { hasText: name })
     await expect(row.locator('svg.league-badge')).toHaveCount(1)
-    await expect(row.locator('.board-score')).toContainText(/of \d+ quests/)
+    await expect(row.locator('.board-score')).toHaveAttribute('aria-label', /of \d+ quests/)
   }
 
-  // last week's final standings persist as a small card
+  // last week collapses to the podium + the child, expandable to all 12
   const last = page.locator('section[aria-label="Last week\'s leaderboard"]')
-  await expect(last.locator('.board-row')).toHaveCount(5)
-  await expect(last.locator('.board-friend')).toHaveCount(3)
+  await expect(last.locator('.board-row').nth(3)).toBeVisible()
+  await expect(last.locator('.board-row')).toHaveCount(4, { timeout: 3000 }).catch(async () => {
+    // 3 rows only if the child is on the podium
+    await expect(last.locator('.board-row')).toHaveCount(3)
+  })
+  await last.getByRole('button', { name: /Show all/ }).click()
+  await expect(last.locator('.board-row')).toHaveCount(12)
+  await expect(last.locator('.board-friend')).toHaveCount(10)
 })
 
 test('how leagues work explainer is expandable; no demotion language anywhere', async ({
@@ -77,7 +90,7 @@ test('how leagues work explainer is expandable; no demotion language anywhere', 
 test('storybook friend numbers are identical after a reload', async ({ page }) => {
   await openLeague(page)
   const before = await thisWeek(page).locator('.board-friend .board-score').allInnerTexts()
-  expect(before).toHaveLength(3)
+  expect(before).toHaveLength(10)
   await page.reload()
   // Theodore is remembered — reload lands straight on his home, no picker
   await expect(page.locator('[data-scene="town"][data-scene-ready="true"]')).toBeAttached()
@@ -97,6 +110,8 @@ test('friends never appear on the grown-ups screen; grown-up rule line shows', a
     for (const d of '1234') await page.getByRole('button', { name: `Digit ${d}` }).click()
   }
   await expect(page.getByText('Waiting for you')).toBeVisible()
-  await expect(page.locator('.grownups-screen')).not.toContainText(/Felix|Riley|Bramble/)
+  await expect(page.locator('.grownups-screen')).not.toContainText(
+    /Felix|Riley|Bramble|Olive|Pip|Hazel|Sunny|Tilly|Poppy|Dot/,
+  )
   await expect(page.locator('.league-rule-note').first()).toContainText('Never moves down')
 })

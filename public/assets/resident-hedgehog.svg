@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90">
+  <ellipse cx="60" cy="86" rx="34" ry="4" fill="#3c3c3c" opacity="0.08"/>
+  <!-- spiky back -->
+  <path d="M24 62 q-2 -24 16 -32 q4 -12 14 -6 q8 -10 16 -2 q10 -6 16 4 q12 2 12 14 q10 8 4 22 q-38 14 -78 0 z" fill="#7a5230"/>
+  <path d="M30 56 q-1 -16 12 -24 q4 -8 11 -4 q6 -8 13 -2 q8 -4 13 4 q9 2 9 10 q8 6 4 16 q-30 12 -62 0 z" fill="#96683f"/>
+  <!-- face + belly -->
+  <ellipse cx="38" cy="60" rx="18" ry="15" fill="#e8c9a0"/>
+  <ellipse cx="58" cy="70" rx="28" ry="12" fill="#e8c9a0"/>
+  <circle cx="30" cy="56" r="2.8" fill="#3c3c3c"/>
+  <ellipse cx="21" cy="62" rx="4" ry="3" fill="#5a4632"/>
+  <path d="M26 68 q6 4 12 1" fill="none" stroke="#a9713c" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- little ears + feet -->
+  <circle cx="36" cy="46" r="4" fill="#e8c9a0"/>
+  <rect x="46" y="76" width="8" height="9" rx="4" fill="#c9a06a"/>
+  <rect x="72" y="74" width="8" height="11" rx="4" fill="#c9a06a"/>
+</svg>

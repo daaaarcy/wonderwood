@@ -27,6 +27,9 @@ if (typeof window !== 'undefined') {
     )
   ;(window as unknown as { __townTruck?: () => void }).__townTruck = () =>
     EventBus.emit('town-tap', { kind: 'truck' })
+  // deterministic captures: park the truck walker at leg+fraction of its route
+  ;(window as unknown as { __townTruckPos?: (leg: number, frac: number) => void }).__townTruckPos =
+    (leg, frac) => EventBus.emit('town-truck-pos', leg, frac)
   ;(window as unknown as { __roomTap?: (spot: string) => void }).__roomTap = (spot) =>
     EventBus.emit('room-tap', { spot })
 }

@@ -1,5 +1,12 @@
-import { useEffect, useRef } from 'react'
-import { badgesFor, leagueWeekStatus, weeklyLeaderboard } from '../../domain/selectors'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import {
+  badgesFor,
+  boardMovement,
+  leagueWeekStatus,
+  rivalNudge,
+  townNews,
+  weeklyLeaderboard,
+} from '../../domain/selectors'
 import type { LeaderboardEntry } from '../../domain/selectors'
 import { addDaysKey, localDateKey, mondayKeyOf } from '../../domain/week'
 import { scheduleForDate } from '../../domain/migrate'
@@ -14,47 +21,97 @@ import { useGameState } from '../../storage/hooks'
 import { LeagueBadge } from '../components/LeagueBadge'
 import { CharacterAvatar } from '../components/CharacterAvatar'
 
-/** One standings row: position, avatar, name, badge, "X of Y quests" + pct. */
+/** Small flat chevrons for position movement — never red, never scary. */
+function MoveMark({ delta }: { delta: number }) {
+  if (delta === 0) return null
+  const up = delta > 0
+  const n = Math.abs(delta)
+  return (
+    <span
+      className={`board-move ${up ? 'move-up' : 'move-down'}`}
+      aria-label={up ? `up ${n} places` : `down ${n} places`}
+    >
+      <svg viewBox="0 0 12 8" width="11" height="8" aria-hidden="true">
+        {up ? (
+          <path d="M1 7 L6 1 L11 7 Z" fill="#58cc02" />
+        ) : (
+          <path d="M1 1 L6 7 L11 1 Z" fill="#b0b0b0" />
+        )}
+      </svg>
+      {n}
+    </span>
+  )
+}
+
+/** Gold/silver/bronze disc for the top 3, plain number below that. */
+function PosDisc({ row }: { row: LeaderboardEntry }) {
+  const medal = row.position === 1 ? 'gold' : row.position === 2 ? 'silver' : row.position === 3 ? 'bronze' : null
+  return (
+    <span
+      className={`board-pos ${medal ? `pos-${medal}` : ''}`}
+      aria-label={`position ${row.position}${row.tied ? ', tied' : ''}`}
+    >
+      {row.position}
+      {row.tied ? '=' : ''}
+    </span>
+  )
+}
+
+/** One standings row: position disc + move, avatar (paw badge on friends),
+ *  one-line name, league badge, compact "done/total" over pct. */
 function BoardRow({
   row,
   state,
   isMe,
   showBadge,
   emptyText,
+  move,
 }: {
   row: LeaderboardEntry
   state: GameState
   isMe: boolean
   showBadge: boolean
   emptyText: string
+  move?: number
 }) {
+  const scoreText =
+    row.opportunities > 0 ? `${row.completed}/${row.opportunities}` : emptyText
   return (
-    <li className={`board-row ${row.kind === 'npc' ? 'board-friend' : ''} ${isMe ? 'board-me' : ''}`}>
-      <span className="board-pos" aria-label={`position ${row.position}${row.tied ? ', tied' : ''}`}>
-        {row.position}
-        {row.tied ? '=' : ''}
+    <li
+      className={`board-row ${row.kind === 'npc' ? 'board-friend' : ''} ${isMe ? 'board-me' : ''} ${
+        row.pct >= 0.7 ? 'on-track' : ''
+      }`}
+    >
+      <span className="board-poswrap">
+        <PosDisc row={row} />
+        {move !== undefined && move !== 0 && <MoveMark delta={move} />}
       </span>
-      {row.kind === 'npc' ? (
-        <img className="board-avatar" src={assetUrl(row.assetKey ?? '')} alt="" />
-      ) : (
-        <CharacterAvatar
-          childId={row.id as ChildId}
-          hatItemId={state.children[row.id as ChildId].equipped.hat}
-          size={42}
-          headOnly
-        />
-      )}
-      <span className="board-name">
-        {row.name}
-        {row.kind === 'npc' && (
-          <span className="tag-friend">
-            <PawIcon size={12} /> Storybook friend
-          </span>
+      <span className="board-avatarwrap">
+        {row.kind === 'npc' ? (
+          <>
+            <img className="board-avatar" src={assetUrl(row.assetKey ?? '')} alt="" />
+            <span className="paw-badge" role="img" aria-label="Storybook friend">
+              <PawIcon size={9} />
+            </span>
+          </>
+        ) : (
+          <CharacterAvatar
+            childId={row.id as ChildId}
+            hatItemId={state.children[row.id as ChildId].equipped.hat}
+            size={42}
+            headOnly
+          />
         )}
       </span>
-      {showBadge && <LeagueBadge rank={row.leagueRank} size={34} />}
-      <span className="board-score">
-        <b>{row.opportunities > 0 ? `${row.completed} of ${row.opportunities} quests` : emptyText}</b>
+      <span className="board-name">{row.name}</span>
+      {showBadge && <LeagueBadge rank={row.leagueRank} size={30} />}
+      <span
+        className="board-score"
+        aria-label={
+          row.opportunities > 0 ? `${row.completed} of ${row.opportunities} quests` : emptyText
+        }
+      >
+        <b>{scoreText}</b>
         <span className="muted">{Math.round(row.pct * 100)}%</span>
       </span>
     </li>
@@ -69,13 +126,32 @@ export function LeagueScreen({ childId }: { childId: ChildId }) {
   const now = new Date()
   const week = leagueWeekStatus(state, childId, now)
   const ladderRef = useRef<HTMLLIElement>(null)
+  const [lastExpanded, setLastExpanded] = useState(false)
 
   // this week so far + last week's final standings — all purely derived
   const todayKey = localDateKey(now, state.timeZone)
   const weekKey = mondayKeyOf(todayKey)
   const board = weeklyLeaderboard(state, weekKey, todayKey)
+  const movement = boardMovement(state, weekKey, todayKey)
   const lastWeekKey = addDaysKey(weekKey, -7)
   const lastBoard = weeklyLeaderboard(state, lastWeekKey, addDaysKey(weekKey, -1))
+  const news = townNews(state, todayKey)
+  const nudge = rivalNudge(board, childId)
+
+  // the dashed "on track to move up" divider sits between ≥70% rows and the rest
+  const firstBelow = board.findIndex((r) => r.pct < 0.7)
+  const showDivider = firstBelow > 0 && firstBelow < board.length
+
+  // last week collapses to the podium + the child's own row
+  const lastVisible = lastExpanded
+    ? lastBoard
+    : (() => {
+        const keep = lastBoard.slice(0, 3)
+        const me = lastBoard.find((r) => r.id === childId)
+        if (me && !keep.includes(me)) keep.push(me)
+        return keep
+      })()
+  const lastHidden = lastBoard.length - lastVisible.length
 
   // the boys' own quest icons for the "How leagues work" card
   const questIcons = [
@@ -144,26 +220,45 @@ export function LeagueScreen({ childId }: { childId: ChildId }) {
             Hard week? You stay where you are — <b>you can never drop down.</b>
           </li>
         </ul>
-        <p className="muted league-how-note">Felix, Riley and Bramble play by the same rules.</p>
+        <p className="muted league-how-note">
+          All the storybook friends play by the same rules.
+        </p>
       </details>
 
       <section className="panel board-card" aria-label="This week's leaderboard">
         <h3>This week&rsquo;s leaderboard</h3>
+        {news.length > 0 && (
+          <ul className="news-strip" aria-label="Town news">
+            {news.map((line) => (
+              <li key={line} className="news-line">
+                {line}
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="board-nudge">{nudge}</p>
         <ol className="board-list">
-          {board.map((row) => (
-            <BoardRow
-              key={row.id}
-              row={row}
-              state={state}
-              isMe={row.id === childId}
-              showBadge
-              emptyText="No quests yet"
-            />
+          {board.map((row, i) => (
+            <Fragment key={row.id}>
+              {showDivider && i === firstBelow && (
+                <li className="board-divider" role="separator" aria-hidden="true">
+                  <span>On track to move up</span>
+                </li>
+              )}
+              <BoardRow
+                row={row}
+                state={state}
+                isMe={row.id === childId}
+                showBadge
+                emptyText="No quests"
+                move={movement.get(row.id)}
+              />
+            </Fragment>
           ))}
         </ol>
         <p className="muted board-note">
-          <PawIcon size={15} /> Storybook friends are pretend friends from the town — they play
-          along for fun.
+          <PawIcon size={15} /> marks a storybook friend — pretend friends from the town who
+          play along for fun.
         </p>
         <p className="board-cheer">Keep going, explorers!</p>
       </section>
@@ -171,17 +266,27 @@ export function LeagueScreen({ childId }: { childId: ChildId }) {
       <section className="panel board-card board-last" aria-label="Last week's leaderboard">
         <h3>Last week</h3>
         <ol className="board-list">
-          {lastBoard.map((row) => (
+          {lastVisible.map((row) => (
             <BoardRow
               key={row.id}
               row={row}
               state={state}
               isMe={row.id === childId}
               showBadge={false}
-              emptyText="No quests that week"
+              emptyText="No quests"
             />
           ))}
         </ol>
+        {lastHidden > 0 && !lastExpanded && (
+          <button className="btn btn-ghost btn-small" onClick={() => setLastExpanded(true)}>
+            Show all {lastBoard.length}
+          </button>
+        )}
+        {lastExpanded && (
+          <button className="btn btn-ghost btn-small" onClick={() => setLastExpanded(false)}>
+            Show less
+          </button>
+        )}
       </section>
 
       <section className="panel league-ladder" aria-label="League ladder">

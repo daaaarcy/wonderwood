@@ -1,9 +1,11 @@
 import { addDaysKey, localDateKey, mondayKeyOf, weekdayOf } from './week.ts'
 import { scheduleForDate } from './migrate.ts'
 import { projectById } from '../data/city.ts'
-import { CHILD_LIST } from '../data/children.ts'
-import { customQuestsOn, weekEligibility, weeklyDaysCount } from './commands.ts'
-import { NPCS, npcLeagueRank, npcWeekProgress } from './npcs.ts'
+import { CHILDREN, CHILD_LIST } from '../data/children.ts'
+import { countedClaims, customQuestsOn, weekEligibility, weeklyDaysCount } from './commands.ts'
+import { NPCS, npcDayCount, npcDayStreak, npcLeagueRank, npcWeekProgress } from './npcs.ts'
+import { rngFromSeed } from './challenge.ts'
+import { questById } from '../data/quests.ts'
 import { DEFAULT_WEEKLY, weeklyTemplateById } from '../data/weekly.ts'
 import type { ChildId, Claim, GameState, ProjectId, RepairIncident, WeeklyBadge } from './types.ts'
 import { BONUS_SLOTS_PER_DAY } from './types.ts'
@@ -206,15 +208,7 @@ export function leagueWeekStatus(state: GameState, childId: ChildId, now: Date):
       opportunities += core.length + custom
     }
   }
-  const claims = Object.values(state.claims).filter(
-    (c) =>
-      c.childId === childId &&
-      c.status === 'approved' &&
-      c.activityDate >= week &&
-      c.activityDate <= sunday &&
-      (c.role === 'core' || c.role === 'custom') &&
-      (c.reward?.stars ?? 0) > 0,
-  )
+  const claims = countedClaims(state, childId, week, sunday)
   const count = claims.length
   const activeDays = new Set(claims.map((c) => c.activityDate)).size
   const restWeek = days < 3
@@ -249,16 +243,9 @@ export function childWeekScore(
   const sunday = addDaysKey(weekKey, 6)
   const through = throughKey < sunday ? throughKey : sunday
   const { opportunities } = weekEligibility(state, childId, weekKey, through)
-  const completed = Object.values(state.claims).filter(
-    (c) =>
-      c.childId === childId &&
-      c.status === 'approved' &&
-      c.activityDate >= weekKey &&
-      c.activityDate <= through &&
-      (c.role === 'core' || c.role === 'custom') &&
-      (c.reward?.stars ?? 1) > 0,
-  ).length
-  return { completed, opportunities, pct: opportunities > 0 ? completed / opportunities : 0 }
+  const completed = countedClaims(state, childId, weekKey, through).length
+  const pct = opportunities > 0 ? Math.min(1, completed / opportunities) : 0
+  return { completed, opportunities, pct }
 }
 
 export interface LeaderboardEntry {
@@ -318,6 +305,98 @@ export function weeklyLeaderboard(
     const tied = rows.some((r, j) => j !== i && pctKey(r.pct) === pctKey(row.pct))
     return { ...row, position: first + 1, tied }
   })
+}
+
+/**
+ * Position change per row vs yesterday — positive means the row moved UP the
+ * board. Only meaningful within one week, so it's empty on Mondays (and in
+ * week one when there is no yesterday to compare with).
+ */
+export function boardMovement(
+  state: GameState,
+  weekKey: string,
+  todayKey: string,
+): Map<string, number> {
+  const deltas = new Map<string, number>()
+  const yesterday = addDaysKey(todayKey, -1)
+  if (yesterday < weekKey) return deltas
+  const now = weeklyLeaderboard(state, weekKey, todayKey)
+  const before = new Map(
+    weeklyLeaderboard(state, weekKey, yesterday).map((r) => [r.id, r.position] as const),
+  )
+  for (const row of now) {
+    const prev = before.get(row.id)
+    if (prev !== undefined) deltas.set(row.id, prev - row.position)
+  }
+  return deltas
+}
+
+/**
+ * A kind little nudge for the viewing child: how many more quests it takes
+ * to pass the neighbour directly above (at that neighbour's current pct).
+ * When the child leads — or the gap needs more quests than remain possible
+ * this week — the message stays encouraging without numbers.
+ */
+export function rivalNudge(board: LeaderboardEntry[], childId: ChildId): string {
+  const idx = board.findIndex((r) => r.id === childId)
+  const me = idx >= 0 ? board[idx] : undefined
+  if (!me) return 'Keep going, explorer!'
+  if (me.position === 1 && idx === 0) return "You're leading the town this week!"
+  // the nearest storybook friend above — the brothers cooperate, so the
+  // sibling's row is never the rival
+  const rival = board
+    .slice(0, idx)
+    .reverse()
+    .find((r) => r.kind === 'npc')
+  if (!rival) return "You're leading the town this week!"
+  if (me.opportunities <= 0) return `Keep going to catch up with ${rival.name}!`
+  const needed = Math.max(1, Math.floor(rival.pct * me.opportunities) - me.completed + 1)
+  const left = me.opportunities - me.completed
+  if (needed > left) return `Keep going to catch up with ${rival.name}!`
+  return `Just ${needed} more quest${needed === 1 ? '' : 's'} to pass ${rival.name}!`
+}
+
+/**
+ * Today's little town-news lines for the league screen: real quest finishes
+ * from the two boys plus seeded storybook-friend doings. Deterministic per
+ * day; never about anyone doing badly.
+ */
+export function townNews(state: GameState, todayKey: string): string[] {
+  const lines: string[] = []
+
+  // the boys' own approved quests today — real, not seeded
+  const done = new Set<string>()
+  for (const c of Object.values(state.claims)) {
+    if (c.status !== 'approved' || c.activityDate !== todayKey) continue
+    const key = `${c.childId}:${c.questId}`
+    if (done.has(key)) continue
+    done.add(key)
+    const title = c.questTitle ?? questById(c.questId)?.label ?? 'a quest'
+    lines.push(`${CHILDREN[c.childId].name} finished ${title} today!`)
+  }
+
+  // storybook friends' days — seeded, same on every device
+  const weekKey = mondayKeyOf(todayKey)
+  const friendBits: { id: string; text: string }[] = []
+  for (const npc of NPCS) {
+    const today = npcDayCount(npc.id, weekKey, todayKey)
+    if (today >= 2) {
+      friendBits.push({ id: npc.id, text: `${npc.name} finished ${today} quests today!` })
+    }
+    const streak = npcDayStreak(npc.id, weekKey, todayKey)
+    if (streak >= 3) {
+      friendBits.push({ id: npc.id, text: `${npc.name} is on a ${streak}-day streak!` })
+    }
+  }
+  // stable seeded shuffle → 1–2 friend lines
+  const rand = rngFromSeed(`news:${todayKey}`)
+  for (let i = friendBits.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rand() * (i + 1))
+    ;[friendBits[i], friendBits[j]] = [friendBits[j], friendBits[i]]
+  }
+  lines.push(...friendBits.slice(0, Math.min(2, friendBits.length)).map((b) => b.text))
+
+  return lines.slice(0, 3)
 }
 
 /* ---------------- weekly challenge + repairs (v6) ---------------- */

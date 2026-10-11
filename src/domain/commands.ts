@@ -142,17 +142,6 @@ const PROMOTION_FRACTION = 0.7
 const MIN_ACTIVE_DAYS = 3
 const MIN_ELIGIBLE_DAYS = 3
 
-function approvedClaimsInWeek(state: GameState, childId: ChildId, weekKey: string): Claim[] {
-  const sunday = addDaysKey(weekKey, 6)
-  return Object.values(state.claims).filter(
-    (c) =>
-      c.childId === childId &&
-      c.status === 'approved' &&
-      c.activityDate >= weekKey &&
-      c.activityDate <= sunday,
-  )
-}
-
 /** Active custom quests assigned to `childId` that are scheduled on `dateKey`. */
 export function customQuestsOn(state: GameState, childId: ChildId, dateKey: string): CustomQuest[] {
   const weekday = (weekdayOf(dateKey) + 6) % 7
@@ -193,13 +182,42 @@ export function weekEligibility(
 }
 
 /**
- * Approved claims that carried a star reward: the first core approval per
- * quest/day, plus approved custom tasks that award ≥1★ (same as core).
+ * Approved claims that actually count toward a week: starred core/custom
+ * claims on an eligible day (≥ createdAt, not paused) whose quest was
+ * scheduled for that child on that day — a core slot or an active custom
+ * task — deduped per (questId, activityDate). Shared numerator for the
+ * promotion rule and the weekly leaderboard, so completed ≤ opportunities
+ * by construction.
  */
-function approvedCoreClaimsInWeek(state: GameState, childId: ChildId, weekKey: string): Claim[] {
-  return approvedClaimsInWeek(state, childId, weekKey).filter(
-    (c) => (c.role === 'core' || c.role === 'custom') && (c.reward?.stars ?? 1) > 0,
-  )
+export function countedClaims(
+  state: GameState,
+  childId: ChildId,
+  weekKey: string,
+  throughKey: string,
+): Claim[] {
+  const createdKey = localDateKey(new Date(state.createdAt), state.timeZone)
+  const sunday = addDaysKey(weekKey, 6)
+  const through = throughKey < sunday ? throughKey : sunday
+  const seen = new Set<string>()
+  const out: Claim[] = []
+  for (const c of Object.values(state.claims)) {
+    if (c.childId !== childId || c.status !== 'approved') continue
+    if (c.activityDate < weekKey || c.activityDate > through) continue
+    if ((c.role !== 'core' && c.role !== 'custom') || (c.reward?.stars ?? 1) <= 0) continue
+    const day = c.activityDate
+    if (day < createdKey || state.pausedDates[childId].includes(day)) continue
+    const weekday = (weekdayOf(day) + 6) % 7
+    const scheduled =
+      c.role === 'core'
+        ? (scheduleForDate(state, day)[childId].core[weekday] ?? []).includes(c.questId)
+        : customQuestsOn(state, childId, day).some((q) => q.id === c.questId)
+    if (!scheduled) continue
+    const key = `${c.questId}:${day}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(c)
+  }
+  return out
 }
 
 /** Does this child qualify for promotion from week `weekKey` right now? */
@@ -207,7 +225,7 @@ function weekQualifies(state: GameState, childId: ChildId, weekKey: string): boo
   const sunday = addDaysKey(weekKey, 6)
   const { eligibleDays: eligible, opportunities } = weekEligibility(state, childId, weekKey, sunday)
   if (eligible < MIN_ELIGIBLE_DAYS) return false
-  const claims = approvedCoreClaimsInWeek(state, childId, weekKey)
+  const claims = countedClaims(state, childId, weekKey, sunday)
   const count = claims.length
   const activeDays = new Set(claims.map((c) => c.activityDate)).size
   return count >= Math.ceil(PROMOTION_FRACTION * opportunities) && activeDays >= MIN_ACTIVE_DAYS

@@ -32,6 +32,23 @@ const FONT = "'Nunito', ui-rounded, sans-serif"
 /** The road extension occupies the lane leaving the square to the east. */
 const ROAD_LANE = { x0: 762, y0: 406, x1: 1000, y1: 474 }
 
+/**
+ * Truck route — measured against the painted roads:
+ *  - vertical road: x 455–545, y 500 → 700 (centre line x=500, right lanes ±22)
+ *  - plaza oval: centre (500,400) r 235×105 → its SE edge is skirted by the turns
+ *  - east lane: x 762–1000, y 406–474 (dashes at y≈440, lanes y≈457 / y≈423)
+ * One continuous loop: up the east lane → turn south of the plaza → right
+ * along the south lane → off-screen pause → back west on the north lane →
+ * turn down → down the west lane → pause → repeat.
+ */
+const TRUCK_SPEED = 95 // px/s
+const TRUCK_SIZES = {
+  truck: { w: 120, h: 84 },
+  'truck-front': { w: 78, h: 78 },
+  'truck-back': { w: 78, h: 78 },
+} as const
+
+
 interface RenderedProject {
   container: Phaser.GameObjects.Container
   kits: number
@@ -73,9 +90,15 @@ export class TownScene extends Phaser.Scene {
   }
   private rendered = new Map<ProjectId, RenderedProject>()
   private truck: Phaser.GameObjects.Image | null = null
-  private truckPath!: Phaser.Curves.Path
-  private truckT = 0
-  private truckDir = 1
+  private truckShadow: Phaser.GameObjects.Ellipse | null = null
+  /** Route legs — driven as one continuous loop, no reversing. */
+  private truckLegs: { curve: Phaser.Curves.Line | Phaser.Curves.QuadraticBezier; len: number }[] = []
+  private truckLegIdx = 0
+  private truckDist = 0
+  private truckPause = 0
+  private puffMs = 0
+  private bobMs = 0
+  private truckSprite = ''
   private truckDelivering = false
   private foundersBuilt = false
   private foundersPlanks = 0
@@ -97,7 +120,9 @@ export class TownScene extends Phaser.Scene {
     this.load.svg('hat-leaf', 'assets/hat-leaf.svg', { width: 240, height: 180 })
     this.load.svg('bridge-plank', 'assets/bridge-plank.svg', { width: 128, height: 56 })
     this.load.svg('kit-box', 'assets/kit-box.svg', { width: 128, height: 128 })
-    this.load.svg('truck', 'assets/truck.svg', { width: 280, height: 180 })
+    this.load.svg('truck', 'assets/truck.svg', { width: 280, height: 196 })
+    this.load.svg('truck-front', 'assets/truck-front.svg', { width: 196, height: 196 })
+    this.load.svg('truck-back', 'assets/truck-back.svg', { width: 196, height: 196 })
     this.load.svg('resident-fox', 'assets/resident-fox.svg', { width: 120, height: 90 })
     this.load.svg('resident-rabbit', 'assets/resident-rabbit.svg', { width: 100, height: 100 })
     this.load.svg('resident-bear', 'assets/resident-bear.svg', { width: 120, height: 100 })
@@ -227,15 +252,108 @@ export class TownScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number) {
-    if (!this.truck || !this.truck.visible || this.truckDelivering) return
-    this.truckT += 0.000055 * delta * this.truckDir
-    if (this.truckT >= 1 || this.truckT <= 0) {
-      this.truckT = Phaser.Math.Clamp(this.truckT, 0, 1)
-      this.truckDir *= -1
-      this.truck.setFlipX(this.truckDir < 0)
+    if (!this.truck || !this.truckShadow || !this.truck.visible || this.truckDelivering) return
+    if (this.reducedMotion) return // parked at the roadside
+
+    // off-screen pause between loops
+    if (this.truckPause > 0) {
+      this.truckPause -= delta
+      if (this.truckPause <= 0) {
+        this.truckLegIdx = (this.truckLegIdx + 1) % this.truckLegs.length
+        this.truckDist = 0
+        this.truck.setAlpha(0)
+        this.truckShadow.setAlpha(0)
+      }
+      return
     }
-    const p = this.truckPath.getPoint(this.truckT)
-    this.truck.setPosition(p.x, p.y)
+
+    const leg = this.truckLegs[this.truckLegIdx]
+    if (!leg) return
+    this.truckDist += (TRUCK_SPEED * delta) / 1000
+    if (this.truckDist >= leg.len) {
+      if (this.riding) {
+        if (this.truckLegIdx >= 4) {
+          // lap done — drop the explorer at the plaza edge, truck drives on
+          this.finishRide()
+        } else {
+          this.truckLegIdx += 1
+          this.truckDist = 0
+        }
+        return
+      }
+      // hidden pauses only where the route leaves the view (east exit, bottom exit)
+      if (this.truckLegIdx === 2 || this.truckLegIdx === this.truckLegs.length - 1) {
+        this.truckPause = Phaser.Math.Between(2000, 5000)
+        return
+      }
+      this.truckLegIdx += 1
+      this.truckDist = 0
+      return
+    }
+
+    const t = leg.curve.getUtoTmapping(0, this.truckDist / leg.len)
+    const p = leg.curve.getPoint(t)
+    const ahead = leg.curve.getPoint(Math.min(1, t + 0.01))
+    const dx = ahead.x - p.x
+    const dy = ahead.y - p.y
+
+    // the rider hops on when the truck reaches the road top, follows it around
+    const ride = this.rideExplorer
+    if (ride) {
+      if (!ride.boarded && this.truckLegIdx >= 1) ride.boarded = true
+      if (ride.boarded) ride.outer.setPosition(p.x, p.y - 52)
+    }
+
+    // sprite by heading; gentle suspension bob
+    this.bobMs += delta
+    const bob = Math.sin(this.bobMs / 140) * 1
+    this.setTruckSprite(dx, dy)
+    this.truck.setPosition(p.x, p.y + bob)
+    this.truckShadow.setPosition(p.x, p.y + 6)
+    this.truck.setDepth(2 + p.y / 700)
+    this.truckShadow.setDepth(2 + (p.y - 1) / 700)
+
+    // fade in/out over the off-screen ends of the route
+    const fade = Math.min(1, this.truckDist / 40, (leg.len - this.truckDist) / 40)
+    this.truck.setAlpha(Phaser.Math.Clamp(fade * 1.4, 0, 1))
+    this.truckShadow.setAlpha(this.truck.alpha * 0.5)
+
+    // little exhaust puffs from the rear
+    this.puffMs += delta
+    if (this.puffMs > 700) {
+      this.puffMs = 0
+      this.exhaustPuff(p.x, p.y, dx, dy)
+    }
+  }
+
+  /** Pick the truck art for a heading: side when |dx|>|dy|, else front/back. */
+  private setTruckSprite(dx: number, dy: number) {
+    const horiz = Math.abs(dx) >= Math.abs(dy)
+    const key = horiz ? 'truck' : dy > 0 ? 'truck-front' : 'truck-back'
+    const flip = horiz && dx < 0
+    if (key !== this.truckSprite) {
+      this.truckSprite = key
+      const size = TRUCK_SIZES[key]
+      this.truck?.setTexture(key).setDisplaySize(size.w, size.h)
+    }
+    this.truck?.setFlipX(flip)
+    // keep the shadow under whichever view is showing
+    this.truckShadow?.setSize(key === 'truck' ? 100 : 76, 12)
+  }
+
+  private exhaustPuff(x: number, y: number, dx: number, dy: number) {
+    const behind = Phaser.Math.Angle.Normalize(Math.atan2(dy, dx) + Math.PI)
+    const px = x + Math.cos(behind) * 52
+    const py = y + Math.sin(behind) * 20 - 4
+    const puff = this.add.circle(px, py, 5, 0xe2e2e2, 0.8).setDepth(2)
+    this.tweens.add({
+      targets: puff,
+      y: py - 16,
+      scale: 1.8,
+      alpha: 0,
+      duration: 700,
+      onComplete: () => puff.destroy(),
+    })
   }
 
   /* ---------------- ambient life ---------------- */
@@ -494,56 +612,59 @@ export class TownScene extends Phaser.Scene {
    * one lap of the road, waving. No coins — just for fun.
    */
   private riding = false
+  private rideExplorer: {
+    outer: Phaser.GameObjects.Container
+    body: Phaser.GameObjects.Image
+    homeX: number
+    homeY: number
+    childId: ChildId
+    boarded: boolean
+  } | null = null
   private onRideRequest(childId: ChildId) {
     this.rideAlong(childId)
   }
   public rideAlong(childId: ChildId) {
-    if (this.riding || !this.truck) return
+    if (this.riding || !this.truck || this.reducedMotion || this.truckDelivering) return
     const outer = this.explorers[childId]
     if (!outer) return
-    this.riding = true
-    const truck = this.truck
-    truck.setVisible(true).setFlipX(false)
     const body = outer.getData('body') as Phaser.GameObjects.Image
-    const homeX = outer.x
-    const homeY = outer.y
-    // hop in — explorer rides the cab, cheering/waving
+    this.riding = true
     body.setTexture(this.texKey(childId, 'cheer'))
+    this.rideExplorer = {
+      outer,
+      body,
+      homeX: outer.x,
+      homeY: outer.y,
+      childId,
+      boarded: false,
+    }
+    // fresh lap from below the bottom edge — fades in and picks them up
+    this.truckLegIdx = 0
+    this.truckDist = 0
+    this.truckPause = 0
+    this.truck.setAlpha(0)
+    this.truckShadow?.setAlpha(0)
+    // trot to the kerb to meet it
+    this.tweens.add({ targets: outer, x: 500, y: 540, duration: 600, ease: 'Quad.easeOut' })
+  }
+
+  /** The lap is done — the explorer hops off at the road top, truck drives on. */
+  private finishRide() {
+    const ride = this.rideExplorer
+    this.riding = false
+    this.rideExplorer = null
+    if (!ride) return
+    if (ride.body.scene) ride.body.setTexture(this.texKey(ride.childId, 'idle'))
     this.tweens.add({
-      targets: outer,
-      x: truck.x,
-      y: truck.y - 46,
-      duration: 400,
+      targets: ride.outer,
+      x: ride.homeX,
+      y: ride.homeY,
+      duration: 520,
       ease: 'Quad.easeOut',
-      onComplete: () => {
-        const lap = { t: 0 }
-        this.tweens.add({
-          targets: lap,
-          t: 1,
-          duration: 4200,
-          ease: 'Linear',
-          onUpdate: () => {
-            const p = this.truckPath.getPoint(lap.t)
-            truck.setPosition(p.x, p.y)
-            outer.setPosition(p.x, p.y - 46)
-          },
-          onComplete: () => {
-            // hop back out to the square
-            this.tweens.add({
-              targets: outer,
-              x: homeX,
-              y: homeY,
-              duration: 420,
-              ease: 'Quad.easeOut',
-              onComplete: () => {
-                if (body.scene) body.setTexture(this.texKey(childId, 'idle'))
-                this.riding = false
-              },
-            })
-          },
-        })
-      },
     })
+    // continue the loop — leg 5 is the drive down off the bottom edge
+    this.truckLegIdx = 5
+    this.truckDist = 0
   }
 
   private cheer(id: ChildId) {
@@ -607,12 +728,34 @@ export class TownScene extends Phaser.Scene {
   /* ---------------- truck ---------------- */
 
   private buildTruck() {
-    this.truckPath = new Phaser.Curves.Path(500, 714)
-    this.truckPath.lineTo(500, 452)
-    this.truckPath.lineTo(560, 440)
-    this.truckPath.lineTo(940, 440)
-    this.truck = this.add.image(500, 714, 'truck').setOrigin(0.5, 0.9)
-    this.truck.setDisplaySize(92, 60)
+    // route legs, measured on the painted roads (see TRUCK_* notes above)
+    const up = new Phaser.Curves.Line(new Phaser.Math.Vector2(522, 780), new Phaser.Math.Vector2(522, 512))
+    const turnOut = new Phaser.Curves.QuadraticBezier(
+      new Phaser.Math.Vector2(522, 512),
+      new Phaser.Math.Vector2(648, 560), // belly stays below the plaza oval
+      new Phaser.Math.Vector2(796, 457),
+    )
+    const east = new Phaser.Curves.Line(new Phaser.Math.Vector2(796, 457), new Phaser.Math.Vector2(1060, 457))
+    const west = new Phaser.Curves.Line(new Phaser.Math.Vector2(1060, 423), new Phaser.Math.Vector2(796, 423))
+    const turnIn = new Phaser.Curves.QuadraticBezier(
+      new Phaser.Math.Vector2(796, 423),
+      new Phaser.Math.Vector2(646, 560), // same south channel, back to the road top
+      new Phaser.Math.Vector2(478, 514),
+    )
+    const down = new Phaser.Curves.Line(new Phaser.Math.Vector2(478, 514), new Phaser.Math.Vector2(478, 780))
+    this.truckLegs = [up, turnOut, east, west, turnIn, down].map((curve) => ({
+      curve,
+      len: curve.getLength(),
+    }))
+
+    this.truckShadow = this.add
+      .ellipse(522, 786, 100, 12, 0x3c3c3c, 0.12)
+      .setVisible(false)
+      .setDepth(2)
+    this.truck = this.add
+      .image(522, 780, 'truck')
+      .setOrigin(0.5, 0.85)
+      .setDisplaySize(TRUCK_SIZES.truck.w, TRUCK_SIZES.truck.h)
     this.truck.setVisible(false)
     this.truck.setInteractive({ useHandCursor: true })
     this.truck.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -629,23 +772,56 @@ export class TownScene extends Phaser.Scene {
       })
       EventBus.emit('town-tap', { kind: 'truck' })
     })
+
+    // test hook — park the walker at a leg+fraction for deterministic captures
+    const posHook = (leg: number, frac: number) => {
+      if (!this.truck || !this.truckLegs[leg]) return
+      this.truckDelivering = false
+      this.riding = false
+      this.truckPause = 0
+      this.truckLegIdx = leg
+      this.truckDist = frac * this.truckLegs[leg].len
+    }
+    EventBus.on('town-truck-pos', posHook)
+    const off = () => EventBus.off('town-truck-pos', posHook)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, off)
+    this.events.once(Phaser.Scenes.Events.DESTROY, off)
+
+    if (this.reducedMotion) {
+      // parked at the roadside, facing right — no loop, no bob, no puffs
+      this.truck.setPosition(560, 470).setDepth(2.5)
+      this.truckShadow.setPosition(560, 476).setDepth(2.49)
+    }
   }
 
-  /** Deliver a kit: truck drives to the site, drops the box, puffs, leaves. */
+  /** Deliver a kit: truck drives up the road then across to the plot, drops
+   *  the box, puffs, leaves. Sprites follow its heading during the tween. */
   private deliverKit(projectId: ProjectId) {
     if (!this.truck) return
     const def = PROJECTS.find((p) => p.id === projectId)
     if (!def) return
     this.truckDelivering = true
-    this.truck.setVisible(true).setFlipX(false).setPosition(500, 714)
+    this.truck.setVisible(true).setAlpha(1).setPosition(522, 730)
+    this.truckShadow?.setVisible(true).setAlpha(0.12).setPosition(522, 736)
     const dropX = Phaser.Math.Clamp(def.pos.x + 64, 60, 930)
     const dropY = Phaser.Math.Clamp(def.pos.y + 56, 200, 668)
+    const keepShadow = () => {
+      this.truckShadow?.setPosition(this.truck!.x, this.truck!.y + 6)
+      this.truck?.setDepth(2 + this.truck.y / 700)
+    }
     this.tweens.chain({
       targets: this.truck,
       tweens: [
-        { x: 500, y: 452, duration: 700, ease: 'Sine.easeInOut' },
-        { x: 560, y: 440, duration: 260, ease: 'Sine.easeInOut' },
-        { x: dropX, y: dropY, duration: 650, ease: 'Sine.easeInOut' },
+        {
+          x: 522, y: 505, duration: 750, ease: 'Sine.easeInOut',
+          onStart: () => this.setTruckSprite(0, -1),
+          onUpdate: keepShadow,
+        },
+        {
+          x: dropX, y: dropY, duration: 750, ease: 'Sine.easeInOut',
+          onStart: () => this.setTruckSprite(dropX - 522, dropY - 505),
+          onUpdate: keepShadow,
+        },
       ],
       onComplete: () => this.dropKit(def.pos.x, def.pos.y, def.pos.x > 500),
     })
@@ -676,20 +852,32 @@ export class TownScene extends Phaser.Scene {
         onComplete: () => puff.destroy(),
       })
     }
+    const keepShadow = () => this.truckShadow?.setPosition(this.truck!.x, this.truck!.y + 6)
     this.tweens.chain({
       targets: this.truck!,
       tweens: leaveRight
-        ? [{ x: 1030, y: 445, duration: 800, ease: 'Sine.easeIn' }]
+        ? [{
+            x: 1060, y: 457, duration: 850, ease: 'Sine.easeIn',
+            onStart: () => this.setTruckSprite(1, 0),
+            onUpdate: keepShadow,
+          }]
         : [
-            { x: 560, y: 440, duration: 500, ease: 'Sine.easeIn' },
-            { x: 500, y: 714, duration: 700, ease: 'Sine.easeIn' },
+            {
+              x: 522, y: 505, duration: 500, ease: 'Sine.easeIn',
+              onStart: () => this.setTruckSprite(522 - this.truck!.x, 505 - this.truck!.y),
+              onUpdate: keepShadow,
+            },
+            {
+              x: 478, y: 760, duration: 700, ease: 'Sine.easeIn',
+              onStart: () => this.setTruckSprite(-44, 255),
+              onUpdate: keepShadow,
+            },
           ],
       onComplete: () => {
         this.truckDelivering = false
-        if (this.truck!.visible) {
-          const p = this.truckPath.getPoint(this.truckT)
-          this.truck!.setPosition(p.x, p.y)
-        }
+        this.truckLegIdx = 0
+        this.truckDist = 0
+        this.truckPause = Phaser.Math.Between(1500, 3000)
       },
     })
   }
@@ -1069,9 +1257,17 @@ export class TownScene extends Phaser.Scene {
       }
     }
 
-    if (this.truck) {
+    if (this.truck && this.truckShadow) {
       const roadOpen = payload.projects.road?.status === 'open'
-      if (!this.truckDelivering) this.truck.setVisible(roadOpen)
+      if (!this.truckDelivering) {
+        this.truck.setVisible(roadOpen)
+        this.truckShadow.setVisible(roadOpen)
+        if (!roadOpen) {
+          this.truckPause = 0
+          this.truckLegIdx = 0
+          this.truckDist = 0
+        }
+      }
     }
 
     this.renderWelcomeSign(payload.cityName)
@@ -1084,28 +1280,47 @@ export class TownScene extends Phaser.Scene {
   private welcomeLabel?: Phaser.GameObjects.Text
 
   private renderWelcomeSign(cityName: string | null) {
-    if (!cityName) return
+    if (!cityName) {
+      this.welcomeSign?.setVisible(false)
+      return
+    }
+    const text = `Welcome to ${cityName}`
+    if (this.welcomeLabel && this.welcomeLabel.text === text) return
     if (!this.welcomeSign) {
-      const c = this.add.container(318, 668)
+      const c = this.add.container(318, 668).setDepth(3)
       const g = this.add.graphics()
-      // two posts
-      g.fillStyle(0x96683f, 1)
-      g.fillRoundedRect(-72, -6, 10, 34, 3)
-      g.fillRoundedRect(62, -6, 10, 34, 3)
-      // board
-      g.fillStyle(0xffffff, 1)
-      g.fillRoundedRect(-96, -56, 192, 50, 12)
-      g.lineStyle(4, 0x58cc02, 1)
-      g.strokeRoundedRect(-96, -56, 192, 50, 12)
       const label = this.add
-        .text(0, -31, '', { fontFamily: FONT, fontSize: '20px', fontStyle: '900', color: '#3c3c3c' })
+        .text(0, -31, '', {
+          fontFamily: FONT,
+          fontSize: '20px',
+          fontStyle: '900',
+          color: '#3c3c3c',
+          align: 'center',
+          wordWrap: { width: 226, useAdvancedWrap: true },
+        })
         .setOrigin(0.5)
       c.add([g, label])
+      c.setData('g', g)
       this.welcomeLabel = label
       this.welcomeSign = c
     }
-    const text = `Welcome to ${cityName}`
-    if (this.welcomeLabel && this.welcomeLabel.text !== text) this.welcomeLabel.setText(text)
+    const label = this.welcomeLabel!
+    label.setText(text)
+    // size the board to the measured text — long names wrap to two lines
+    const bw = Math.min(268, Math.max(150, label.width + 30))
+    const bh = label.height + 20
+    const top = -34 - bh
+    const g = this.welcomeSign!.getData('g') as Phaser.GameObjects.Graphics
+    g.clear()
+    g.fillStyle(0x96683f, 1)
+    g.fillRoundedRect(-bw / 2 + 10, -6, 10, 34, 3)
+    g.fillRoundedRect(bw / 2 - 20, -6, 10, 34, 3)
+    g.fillStyle(0xffffff, 1)
+    g.fillRoundedRect(-bw / 2, top, bw, bh, 12)
+    g.lineStyle(4, 0x58cc02, 1)
+    g.strokeRoundedRect(-bw / 2, top, bw, bh, 12)
+    label.setY(top + bh / 2)
+    this.welcomeSign.setVisible(true)
   }
 
   /** Redraw open buildings when their color/name changes. */

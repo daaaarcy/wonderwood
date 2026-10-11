@@ -1,19 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 90">
-  <ellipse cx="70" cy="86" rx="58" ry="4" fill="#3c3c3c" opacity="0.08"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 140">
+  <!-- delivery truck, side view facing right -->
   <!-- cargo box -->
-  <rect x="8" y="18" width="78" height="48" rx="10" fill="#ffffff"/>
-  <rect x="8" y="18" width="78" height="48" rx="10" fill="none" stroke="#e5e5e5" stroke-width="3"/>
-  <rect x="8" y="54" width="78" height="12" rx="6" fill="#58cc02"/>
+  <rect x="8" y="18" width="118" height="78" rx="12" fill="#f7f7f7"/>
+  <rect x="8" y="18" width="118" height="78" rx="12" fill="none" stroke="#e2e2e2" stroke-width="4"/>
+  <rect x="14" y="26" width="106" height="10" rx="5" fill="#eef5fb"/>
+  <!-- kit-box logo on the side -->
+  <g transform="translate(46 34)">
+    <rect x="0" y="10" width="42" height="34" rx="8" fill="#ff9600"/>
+    <rect x="0" y="0" width="42" height="16" rx="8" fill="#ffb14d"/>
+    <rect x="18" y="0" width="6" height="44" fill="#e08600"/>
+  </g>
   <!-- cab -->
-  <rect x="86" y="30" width="42" height="36" rx="9" fill="#58cc02"/>
-  <rect x="98" y="36" width="22" height="18" rx="5" fill="#eafbff"/>
-  <rect x="86" y="58" width="46" height="8" rx="4" fill="#58a700"/>
-  <!-- kit in the bed -->
-  <rect x="20" y="26" width="30" height="24" rx="5" fill="#c98a5a"/>
-  <path d="M35 26 v24" stroke="#a06a42" stroke-width="3"/>
-  <path d="M20 26 q15 -10 30 0" fill="#e0a76f"/>
+  <path d="M126 96 L126 44 Q126 34 136 34 L164 34 Q176 34 180 46 L188 72 Q190 82 190 96 Z" fill="#1cb0f6"/>
+  <path d="M136 44 L160 44 Q168 44 171 52 L176 68 L136 68 Z" fill="#c8ecff"/>
+  <!-- little driver silhouette -->
+  <circle cx="152" cy="52" r="6" fill="#7a4f33"/>
+  <rect x="147" y="58" width="10" height="8" rx="4" fill="#7a4f33"/>
+  <!-- cab details -->
+  <rect x="128" y="72" width="16" height="6" rx="3" fill="#1899d6"/>
+  <rect x="184" y="76" width="8" height="10" rx="3" fill="#ffc800"/>
+  <!-- bumper + chassis -->
+  <rect x="8" y="94" width="182" height="14" rx="6" fill="#9fb4c4"/>
+  <rect x="186" y="88" width="10" height="16" rx="4" fill="#7d96a8"/>
   <!-- wheels -->
-  <circle cx="30" cy="70" r="11" fill="#3c3c3c"/><circle cx="30" cy="70" r="5" fill="#afafaf"/>
-  <circle cx="72" cy="70" r="11" fill="#3c3c3c"/><circle cx="72" cy="70" r="5" fill="#afafaf"/>
-  <circle cx="110" cy="70" r="11" fill="#3c3c3c"/><circle cx="110" cy="70" r="5" fill="#afafaf"/>
+  <circle cx="46" cy="108" r="18" fill="#3c3c3c"/>
+  <circle cx="46" cy="108" r="9" fill="#9fb4c4"/>
+  <circle cx="46" cy="108" r="3.5" fill="#e2e2e2"/>
+  <circle cx="104" cy="108" r="18" fill="#3c3c3c"/>
+  <circle cx="104" cy="108" r="9" fill="#9fb4c4"/>
+  <circle cx="104" cy="108" r="3.5" fill="#e2e2e2"/>
+  <circle cx="164" cy="108" r="18" fill="#3c3c3c"/>
+  <circle cx="164" cy="108" r="9" fill="#9fb4c4"/>
+  <circle cx="164" cy="108" r="3.5" fill="#e2e2e2"/>
 </svg>

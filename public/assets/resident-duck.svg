@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90">
+  <ellipse cx="60" cy="86" rx="32" ry="4" fill="#3c3c3c" opacity="0.08"/>
+  <!-- tail feather -->
+  <path d="M88 56 q16 -4 18 -18 q-12 2 -18 10 z" fill="#e8b64c"/>
+  <!-- body -->
+  <ellipse cx="58" cy="58" rx="30" ry="22" fill="#ffc800"/>
+  <ellipse cx="50" cy="62" rx="16" ry="12" fill="#ffd94d"/>
+  <!-- wing -->
+  <ellipse cx="62" cy="58" rx="14" ry="10" fill="#f2b90f"/>
+  <!-- head -->
+  <circle cx="40" cy="34" r="18" fill="#ffc800"/>
+  <circle cx="34" cy="30" r="3" fill="#3c3c3c"/>
+  <circle cx="35.5" cy="28.5" r="1" fill="#ffffff"/>
+  <ellipse cx="22" cy="40" rx="10" ry="6" fill="#ff9600"/>
+  <ellipse cx="22" cy="44" rx="7" ry="3" fill="#e08600"/>
+  <!-- feet -->
+  <ellipse cx="46" cy="82" rx="9" ry="4" fill="#ff9600"/>
+  <ellipse cx="68" cy="82" rx="9" ry="4" fill="#ff9600"/>
+</svg>

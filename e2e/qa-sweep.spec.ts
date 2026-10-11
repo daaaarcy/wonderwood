@@ -672,6 +672,47 @@ test('QA: league', async ({ browser }, testInfo) => {
       await shot(page, dev, 'league-explainer')
       await context.close()
     }
+    // full board: 12 rows, movement arrows, move-up line, nudge, news strip
+    {
+      const { context, page } = await qaPage(browser, dev, seedJson(boardSeed()))
+      await openHome(page)
+      await page.getByRole('button', { name: 'League', exact: true }).click()
+      const week = page.locator('section[aria-label="This week\'s leaderboard"]')
+      await expect(week.locator('.board-row')).toHaveCount(12)
+      await expect(week.locator('.board-friend')).toHaveCount(10)
+      await shot(page, dev, 'league-board')
+      // last week: collapsed podium + me → expanded
+      await page.getByRole('button', { name: /Show all/ }).click()
+      await shot(page, dev, 'league-last-expanded')
+      await context.close()
+    }
+    // the truck: deterministic captures at each route leg
+    {
+      const { context, page } = await qaPage(
+        browser,
+        dev,
+        seedJson(citySeed({ road: 2, library: 0 }, { current: 'library' })),
+      )
+      await openHome(page)
+      await page.waitForSelector('[data-scene-ready="true"]')
+      await page.waitForTimeout(400)
+      for (const [leg, frac, name] of [
+        [0, 0.55, 'up'],
+        [1, 0.5, 'turn'],
+        [2, 0.4, 'right'],
+        [4, 0.3, 'left'],
+        [5, 0.45, 'down'],
+      ] as const) {
+        await page.evaluate(
+          ([l, f]) =>
+            (window as unknown as { __townTruckPos?: (a: number, b: number) => void }).__townTruckPos?.(l, f),
+          [leg, frac],
+        )
+        await page.waitForTimeout(400)
+        await shot(page, dev, `truck-${name}`)
+      }
+      await context.close()
+    }
     // ladder low + high
     for (const [rank, name] of [[1, 'low'], [14, 'high']] as const) {
       const { context, page } = await qaPage(browser, dev, seedJson(leagueSeed(rank)))
