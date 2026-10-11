@@ -88,6 +88,48 @@ export function ChildHome({ childId }: { childId: ChildId }) {
   }
   const [busy, setBusy] = useState(false)
   const prev = useRef<{ childId: ChildId; coins: number; stars: number } | null>(null)
+
+  // "Sent to a grown-up · Undo" toast after a successful claim — covers the
+  // card buttons, the reading/housework sheets and the challenge send.
+  const [toast, setToast] = useState<{ claimId: string; checked: boolean } | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const challengeToast = useRef<string | null>(null)
+  const showToast = (claimId: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToast({ claimId, checked: false })
+    toastTimer.current = setTimeout(() => setToast(null), 6000)
+  }
+  useEffect(
+    () => () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current)
+    },
+    [],
+  )
+  // a card opened its undo confirm for the toasted claim → hide the toast
+  useEffect(() => {
+    const hide = (id: string) => setToast((t) => (t?.claimId === id ? null : t))
+    EventBus.on('claim-undo-open', hide)
+    return () => {
+      EventBus.off('claim-undo-open', hide)
+    }
+  }, [])
+
+  const toastUndo = async () => {
+    if (!toast) return
+    const r = await repo.dispatch({ type: 'withdrawClaim', claimId: toast.claimId, childId })
+    if (!r.ok) {
+      // a grown-up got there first — say so kindly, then let the push update the card
+      setToast({ ...toast, checked: true })
+      setTimeout(() => setToast(null), 2400)
+    }
+  }
+
+  /** Shared claim path — toasts on success so the child can undo a mistap. */
+  const doClaim = async (questId: string, details?: import('../../domain/types').ClaimDetails) => {
+    const claimId = crypto.randomUUID()
+    const r = await repo.dispatch({ type: 'claimQuest', childId, questId, claimId, details })
+    if (r.ok) showToast(claimId)
+  }
   const prevBadges = useRef<number | null>(null)
   const [badgeCelebration, setBadgeCelebration] = useState<string | null>(null)
   const prevOpenings = useRef<Set<string> | null>(null)
@@ -375,17 +417,10 @@ export function ChildHome({ childId }: { childId: ChildId }) {
                       quest={quest}
                       status={t.status}
                       childId={childId}
+                      claimId={t.claimId}
                       offline={offline}
                       openSheet={setSheet}
-                      claimQuest={(details) =>
-                        void repo.dispatch({
-                          type: 'claimQuest',
-                          childId,
-                          questId: quest.id,
-                          claimId: crypto.randomUUID(),
-                          details,
-                        })
-                      }
+                      claimQuest={(details) => void doClaim(quest.id, details)}
                       subtitle={
                         quest.id === 'violin'
                           ? state.config[childId].violinGoal
@@ -409,15 +444,10 @@ export function ChildHome({ childId }: { childId: ChildId }) {
                           quest={cq}
                           title={claimTitle}
                           status={t.status}
+                          childId={childId}
+                          claimId={t.claimId}
                           offline={offline}
-                          onClaim={() =>
-                            void repo.dispatch({
-                              type: 'claimQuest',
-                              childId,
-                              questId: t.questId,
-                              claimId: crypto.randomUUID(),
-                            })
-                          }
+                          onClaim={() => void doClaim(t.questId)}
                         />
                       )
                     })}
@@ -443,17 +473,10 @@ export function ChildHome({ childId }: { childId: ChildId }) {
                           quest={quest}
                           status={t.status}
                           childId={childId}
+                          claimId={t.claimId}
                           offline={offline}
                           openSheet={setSheet}
-                          claimQuest={(details) =>
-                            void repo.dispatch({
-                              type: 'claimQuest',
-                              childId,
-                              questId: quest.id,
-                              claimId: crypto.randomUUID(),
-                              details,
-                            })
-                          }
+                          claimQuest={(details) => void doClaim(quest.id, details)}
                         />
                       )
                     })}
@@ -572,13 +595,7 @@ export function ChildHome({ childId }: { childId: ChildId }) {
         <div className="sheet-backdrop" onClick={closeSheet}>
           <ReadingSheet
             onDone={(details) => {
-              void repo.dispatch({
-                type: 'claimQuest',
-                childId,
-                questId: 'reading',
-                claimId: crypto.randomUUID(),
-                details,
-              })
+              void doClaim('reading', details)
               closeSheet()
             }}
           />
@@ -595,13 +612,7 @@ export function ChildHome({ childId }: { childId: ChildId }) {
                   key={job}
                   className="btn btn-neutral"
                   onClick={() => {
-                    void repo.dispatch({
-                      type: 'claimQuest',
-                      childId,
-                      questId: 'housework',
-                      claimId: crypto.randomUUID(),
-                      details: { kind: 'housework', job },
-                    })
+                    void doClaim('housework', { kind: 'housework', job })
                     closeSheet()
                   }}
                 >
@@ -675,6 +686,9 @@ export function ChildHome({ childId }: { childId: ChildId }) {
         <ChallengeModal
           childId={childId}
           questId={sheet.quest.id}
+          onSent={(id) => {
+            challengeToast.current = id
+          }}
           level={state.config[childId].mathLevel}
           runIndex={
             today.restDay
@@ -775,6 +789,21 @@ export function ChildHome({ childId }: { childId: ChildId }) {
 
       {celebration && !promotion && (
         <Celebration childId={childId} data={celebration} onDone={() => setCelebration(null)} />
+      )}
+
+      {toast && state.claims[toast.claimId]?.status === 'pending' && (
+        <div className="claim-toast" role="status">
+          {toast.checked ? (
+            <span>A grown-up already checked this one!</span>
+          ) : (
+            <>
+              <span>Sent to a grown-up</span>
+              <button className="btn btn-yes btn-small toast-undo" onClick={() => void toastUndo()}>
+                Undo
+              </button>
+            </>
+          )}
+        </div>
       )}
     </div>
   )

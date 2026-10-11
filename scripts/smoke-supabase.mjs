@@ -96,6 +96,7 @@ try {
   mark('approve pin'); const withPin = await fn(grown, { action: 'command', householdId: hid, pin: '1234', command: { type: 'approveClaim', claimId } })
   check('approve with PIN ok', withPin.data?.result?.ok === true, `coins=${withPin.data?.state?.children?.theodore?.coins}`)
 
+
   // --- realtime: kid subscription sees the next update ---
   mark('subscribe realtime'); let markSubscribed = () => {}
   const subscribed = new Promise((r) => (markSubscribed = r))
@@ -223,6 +224,47 @@ try {
   check('secrets table unreadable', (secrets ?? []).length === 0)
   const { data: codes } = await stranger.from('pairing_codes').select('*')
   check('pairing codes unreadable', (codes ?? []).length === 0)
+
+  // --- withdraw: kid claims → takes it back → approve of it fails → re-claim works ---
+  mark('withdraw'); const wc = `w-${Date.now()}`
+  const wclaim = await fn(kid, {
+    action: 'command',
+    householdId: hid,
+    command: { type: 'claimQuest', childId: 'leonard', questId: 'violin', claimId: wc },
+  })
+  check('withdraw: claim ok', wclaim.data?.result?.ok === true)
+  const withdrew = await fn(kid, {
+    action: 'command',
+    householdId: hid,
+    command: { type: 'withdrawClaim', claimId: wc, childId: 'leonard' },
+  })
+  check('withdraw: child device can withdraw pending claim', withdrew.data?.result?.ok === true)
+  const approveGone = await fn(grown, {
+    action: 'command',
+    householdId: hid,
+    pin: '1234',
+    command: { type: 'approveClaim', claimId: wc },
+  })
+  check('withdraw: approve of withdrawn claim fails', approveGone.data?.result?.ok === false)
+  const leoCoins = withdrew.data?.state?.children?.leonard?.coins
+  const reclaim = await fn(kid, {
+    action: 'command',
+    householdId: hid,
+    command: { type: 'claimQuest', childId: 'leonard', questId: 'violin', claimId: `${wc}-again` },
+  })
+  check('withdraw: re-claim after undo ok', reclaim.data?.result?.ok === true)
+  const reApprove = await fn(grown, {
+    action: 'command',
+    householdId: hid,
+    pin: '1234',
+    command: { type: 'approveClaim', claimId: `${wc}-again` },
+  })
+  check(
+    'withdraw: re-claimed approval pays normally',
+    reApprove.data?.result?.ok === true &&
+      reApprove.data?.state?.children?.leonard?.coins === leoCoins + 10,
+    `coins=${reApprove.data?.state?.children?.leonard?.coins}`,
+  )
 } finally {
   console.log('\n=== smoke results ===')
   for (const r of results) console.log(r)

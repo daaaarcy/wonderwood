@@ -1168,6 +1168,23 @@ test('QA: challenge levels + send error', async ({ browser }, testInfo) => {
   }
 })
 
+test('QA: withdraw claim (oops, undo)', async ({ browser }, testInfo) => {
+  onlyOnce(testInfo.project.name)
+  for (const dev of DEVICE_NAMES) {
+    const { context, page } = await qaPage(browser, dev, seedJson(freshState()))
+    await openHome(page)
+    const card = page.locator('.quest-card', { hasText: 'Spanish lesson' })
+    await card.getByRole('button', { name: 'I did it!' }).click()
+    await expect(card.getByText('Waiting for a grown-up')).toBeVisible()
+    // toast + pending card with "Oops, undo"
+    await shot(page, dev, 'withdraw-toast')
+    // inline confirm on the card
+    await card.getByRole('button', { name: 'Oops, undo' }).click()
+    await shot(page, dev, 'withdraw-confirm')
+    await context.close()
+  }
+})
+
 test('QA: promotion overlay', async ({ browser }, testInfo) => {
   onlyOnce(testInfo.project.name)
   for (const dev of DEVICE_NAMES) {

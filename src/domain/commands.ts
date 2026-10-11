@@ -440,6 +440,39 @@ export function approveClaim(
   return { state: next, result: ok(approved) }
 }
 
+/**
+ * Take back a claim that hasn't been checked yet — "oops, undo" for a
+ * mistapped "I did it!". Pending claims carry no reward, ledger, journal or
+ * counters (all of those derive at approval time), so deleting the claim is
+ * a full revert: the quest is claimable again, bonus slots and the reading
+ * sequence are untouched.
+ */
+export function withdrawClaim(
+  state: GameState,
+  cmd: { claimId: string; childId: ChildId },
+  now: Date,
+  deps: CommandDeps,
+): CommandOutcome<Claim> {
+  void now
+  void deps
+  const claim = state.claims[cmd.claimId]
+  if (!claim) {
+    return { state, result: err('unknown-claim', 'That claim does not exist.') }
+  }
+  if (claim.childId !== cmd.childId) {
+    return { state, result: err('invalid-claim', 'That is not your claim.') }
+  }
+  if (claim.status !== 'pending') {
+    return {
+      state,
+      result: err('claim-not-pending', 'A grown-up already checked this one.'),
+    }
+  }
+  const claims = { ...state.claims }
+  delete claims[cmd.claimId]
+  return { state: { ...state, claims }, result: ok(claim) }
+}
+
 export function rejectClaim(
   state: GameState,
   cmd: { claimId: string },
@@ -1380,6 +1413,8 @@ export function applyCommand(
   switch (cmd.type) {
     case 'claimQuest':
       return claimQuest(state, cmd, now, deps)
+    case 'withdrawClaim':
+      return withdrawClaim(state, cmd, now, deps)
     case 'approveClaim':
       return approveClaim(state, cmd, now, deps)
     case 'rejectClaim':

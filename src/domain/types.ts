@@ -253,6 +253,7 @@ export interface CatalogItem {
 
 export type Command =
   | { type: 'claimQuest'; childId: ChildId; questId: string; claimId: string; details?: ClaimDetails }
+  | { type: 'withdrawClaim'; claimId: string; childId: ChildId }
   | { type: 'approveClaim'; claimId: string }
   | { type: 'rejectClaim'; claimId: string }
   | { type: 'parentCompleteAndApprove'; childId: ChildId; questId: string; claimId: string; details?: ClaimDetails }
@@ -314,6 +315,7 @@ export type Command =
 export type DomainErrorCode =
   | 'already-claimed-today'
   | 'unknown-claim'
+  | 'invalid-claim'
   | 'claim-not-pending'
   | 'unknown-quest'
   | 'unknown-item'

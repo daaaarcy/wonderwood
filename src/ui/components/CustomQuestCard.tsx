@@ -1,5 +1,8 @@
-import type { CustomQuest } from '../../domain/types'
+import { useState } from 'react'
+import type { ChildId, CustomQuest } from '../../domain/types'
+import { useRepository } from '../../storage/hooks'
 import { assetUrl } from '../../game/assets'
+import { EventBus } from '../../game/EventBus'
 import { FlatIcon } from './FlatIcons'
 
 /** Little clipboard badge for grown-up-written tasks. */
@@ -17,6 +20,8 @@ export function CustomQuestCard({
   quest,
   title,
   status,
+  childId,
+  claimId,
   offline,
   onClaim,
 }: {
@@ -24,9 +29,25 @@ export function CustomQuestCard({
   /** fallback title stored on the claim (archived tasks still render) */
   title?: string
   status: 'available' | 'pending' | 'done'
+  childId: ChildId
+  /** the pending claim's id — enables the "Oops, undo" button */
+  claimId?: string | null
   offline: boolean
   onClaim: () => void
 }) {
+  const repo = useRepository()
+  const [confirming, setConfirming] = useState(false)
+  const [checkedNote, setCheckedNote] = useState(false)
+
+  const undo = async () => {
+    if (!claimId) return
+    const r = await repo.dispatch({ type: 'withdrawClaim', claimId, childId })
+    if (!r.ok) {
+      setConfirming(false)
+      setCheckedNote(true)
+    }
+  }
+
   const coins = quest?.coins ?? 0
   const stars = quest?.stars ?? 0
   const reward =
@@ -64,7 +85,37 @@ export function CustomQuestCard({
           </button>
         </span>
       )}
-      {status === 'pending' && <span className="quest-status">Waiting for a grown-up…</span>}
+      {status === 'pending' &&
+        (confirming ? (
+          <span className="quest-status undo-confirm">
+            Take back {quest?.title ?? title ?? 'this task'}?
+            <span className="undo-actions">
+              <button className="btn btn-yes btn-small" onClick={() => void undo()}>
+                Yes, take it back
+              </button>
+              <button className="btn btn-ghost btn-small" onClick={() => setConfirming(false)}>
+                Keep it
+              </button>
+            </span>
+          </span>
+        ) : (
+          <span className="quest-status">
+            {checkedNote ? 'A grown-up already checked this one!' : 'Waiting for a grown-up…'}
+            {claimId && !checkedNote && (
+              <button
+                className="undo-link"
+                onClick={() => {
+                  // hide the "Sent · Undo" toast for this claim so it can't
+                  // sit over the confirm buttons
+                  EventBus.emit('claim-undo-open', claimId)
+                  setConfirming(true)
+                }}
+              >
+                Oops, undo
+              </button>
+            )}
+          </span>
+        ))}
       {status === 'done' && (
         <span className="quest-status quest-done">
           <img src={assetUrl('star')} alt="" /> Done!

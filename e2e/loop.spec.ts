@@ -153,3 +153,68 @@ test("Leonard's quests differ from Theodore's", async ({ page }) => {
   await expect(page.locator('.quest-label', { hasText: 'Reading' })).toBeVisible()
   await expect(page.getByText('Spanish lesson')).toBeHidden()
 })
+
+test('withdraw: toast Undo takes the claim back; card undo confirms first', async ({ page }) => {
+  await page.goto('/')
+  await pickExplorer(page, 'Theodore')
+
+  const card = page.locator('.quest-card', { hasText: 'Spanish lesson' })
+
+  // claim → toast with Undo → tap it → back to "I did it!"
+  await card.getByRole('button', { name: 'I did it!' }).click()
+  const toast = page.locator('.claim-toast')
+  await expect(toast).toContainText('Sent to a grown-up')
+  await toast.getByRole('button', { name: 'Undo' }).click()
+  await expect(card.getByRole('button', { name: 'I did it!' })).toBeVisible()
+
+  // claim again → card "Oops, undo" → keep → confirm → available again
+  await card.getByRole('button', { name: 'I did it!' }).click()
+  await expect(card.getByText('Waiting for a grown-up')).toBeVisible()
+  await card.getByRole('button', { name: 'Oops, undo' }).click()
+  await expect(card.getByText(/Take back Spanish lesson/)).toBeVisible()
+  await card.getByRole('button', { name: 'Keep it' }).click()
+  await expect(card.getByText('Waiting for a grown-up')).toBeVisible()
+  await card.getByRole('button', { name: 'Oops, undo' }).click()
+  await card.getByRole('button', { name: 'Yes, take it back' }).click()
+  await expect(card.getByRole('button', { name: 'I did it!' })).toBeVisible()
+})
+
+test('withdraw: an approved claim has no undo; a withdrawn claim vanishes for the grown-up', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await pickExplorer(page, 'Theodore')
+
+  const card = page.locator('.quest-card', { hasText: 'Spanish lesson' })
+  await card.getByRole('button', { name: 'I did it!' }).click()
+  await expect(card.getByRole('button', { name: 'Oops, undo' })).toBeVisible()
+
+  // approve as grown-up → back on the card there's no undo, just Done!
+  await switchExplorer(page)
+  await enterGrownups(page)
+  const row = page.locator('.pending-panel .claim-row', { hasText: 'Spanish lesson' })
+  await row.getByRole('button', { name: 'Approve' }).click()
+  await expect(row).toBeHidden()
+  await page.getByRole('button', { name: 'Back to explorers' }).click()
+  await pickExplorer(page, 'Theodore')
+  await dismissCelebration(page)
+  await expect(card.getByText('Done!')).toBeVisible()
+  await expect(card.getByRole('button', { name: 'Oops, undo' })).toHaveCount(0)
+})
+
+test('withdraw: the claim disappears from the grown-up approve list', async ({ page }) => {
+  await page.goto('/')
+  await pickExplorer(page, 'Theodore')
+
+  const card = page.locator('.quest-card', { hasText: 'Spanish lesson' })
+  await card.getByRole('button', { name: 'I did it!' }).click()
+  await card.getByRole('button', { name: 'Oops, undo' }).click()
+  await card.getByRole('button', { name: 'Yes, take it back' }).click()
+  await expect(card.getByRole('button', { name: 'I did it!' })).toBeVisible()
+
+  await switchExplorer(page)
+  await enterGrownups(page)
+  await expect(
+    page.locator('.pending-panel .claim-row', { hasText: 'Spanish lesson' }),
+  ).toHaveCount(0)
+})

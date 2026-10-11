@@ -19,6 +19,8 @@ interface Props {
   /** true once a claim already exists today → replay for fun, no reward sheet */
   replay: boolean
   onClose: () => void
+  /** fired with the new claimId after a successful send — for the undo toast */
+  onSent?: (claimId: string) => void
 }
 
 /** Grey cross drawn over a taken-away token — sized to whatever the token is. */
@@ -178,7 +180,7 @@ function Picture({
   )
 }
 
-export function ChallengeModal({ childId, questId, level, runIndex, today, replay, onClose }: Props) {
+export function ChallengeModal({ childId, questId, level, runIndex, today, replay, onClose, onSent }: Props) {
   const repo = useRepository()
   const questions = useMemo(
     () => generateChallenge(level, `${childId}:${today}:${runIndex}`),
@@ -264,16 +266,18 @@ export function ChallengeModal({ childId, questId, level, runIndex, today, repla
       hintsUsed,
       correctFirstTry,
     }
+    const claimId = crypto.randomUUID()
     const r = await repo.dispatch({
       type: 'claimQuest',
       childId,
       questId,
-      claimId: crypto.randomUUID(),
+      claimId,
       details,
     })
     setSending(false)
     if (r.ok) {
       setSent(true)
+      onSent?.(claimId)
       return
     }
     const code = 'error' in r ? r.error.code : undefined

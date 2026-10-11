@@ -636,6 +636,66 @@ button {
   gap: 6px;
   flex-shrink: 0;
   font-size: 0.95rem;
+  flex-wrap: wrap;
+}
+/* "Oops, undo" — small secondary link on the pending status line */
+.undo-link {
+  border: none;
+  background: none;
+  padding: 8px 6px;
+  min-height: 44px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--blue);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.undo-confirm {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+.undo-actions {
+  display: flex;
+  gap: 8px;
+}
+.undo-actions .btn {
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+/* post-claim toast — sits just above the fixed bottom nav */
+.claim-toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none; /* taps pass through except the Undo button */
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  z-index: 44;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  border: 2px solid var(--border);
+  background: var(--white);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.08);
+  font-weight: 900;
+  font-size: 0.95rem;
+  max-width: calc(100vw - 24px);
+}
+.claim-toast .toast-undo {
+  pointer-events: auto;
+  min-height: 44px;
+  padding: 8px 16px;
+}
+@media (min-width: 900px) {
+  .claim-toast {
+    bottom: 24px;
+  }
 }
 .weekly-card .quest-sub {
   flex-wrap: wrap;

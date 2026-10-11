@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { ChildId, ClaimDetails } from '../../domain/types'
 import type { QuestDef } from '../../data/quests'
-import { useGameState } from '../../storage/hooks'
+import { useGameState, useRepository } from '../../storage/hooks'
 import { assetUrl } from '../../game/assets'
+import { EventBus } from '../../game/EventBus'
 import { SpeakerIcon } from './SpeakerIcon'
 
 type SheetFn = (s: { kind: 'reading' } | { kind: 'housework' } | { kind: 'challenge'; quest: QuestDef }) => void
@@ -11,6 +12,7 @@ export function QuestCard({
   quest,
   status,
   childId,
+  claimId,
   offline,
   claimQuest,
   openSheet,
@@ -19,12 +21,27 @@ export function QuestCard({
   quest: QuestDef
   status: 'available' | 'pending' | 'done'
   childId: ChildId
+  /** the pending claim's id — enables the "Oops, undo" button */
+  claimId?: string | null
   offline: boolean
   claimQuest: (details?: ClaimDetails) => void
   openSheet: SheetFn
   subtitle?: ReactNode
 }) {
   const state = useGameState()
+  const repo = useRepository()
+  const [confirming, setConfirming] = useState(false)
+  const [checkedNote, setCheckedNote] = useState(false)
+
+  const undo = async () => {
+    if (!claimId) return
+    const r = await repo.dispatch({ type: 'withdrawClaim', claimId, childId })
+    if (!r.ok) {
+      // a grown-up got there first — the next state push flips the card
+      setConfirming(false)
+      setCheckedNote(true)
+    }
+  }
   const config = state.config[childId]
   const url =
     quest.kind.type === 'external'
@@ -103,7 +120,37 @@ export function QuestCard({
           )}
         </span>
       )}
-      {status === 'pending' && <span className="quest-status">Waiting for a grown-up…</span>}
+      {status === 'pending' &&
+        (confirming ? (
+          <span className="quest-status undo-confirm">
+            Take back {quest.label}?
+            <span className="undo-actions">
+              <button className="btn btn-yes btn-small" onClick={() => void undo()}>
+                Yes, take it back
+              </button>
+              <button className="btn btn-ghost btn-small" onClick={() => setConfirming(false)}>
+                Keep it
+              </button>
+            </span>
+          </span>
+        ) : (
+          <span className="quest-status">
+            {checkedNote ? 'A grown-up already checked this one!' : 'Waiting for a grown-up…'}
+            {claimId && !checkedNote && (
+              <button
+                className="undo-link"
+                onClick={() => {
+                  // hide the "Sent · Undo" toast for this claim so it can't
+                  // sit over the confirm buttons
+                  EventBus.emit('claim-undo-open', claimId)
+                  setConfirming(true)
+                }}
+              >
+                Oops, undo
+              </button>
+            )}
+          </span>
+        ))}
       {quest.kind.type === 'reading' && status !== 'available' && (
         <button className="btn btn-neutral btn-small" onClick={() => openSheet({ kind: 'reading' })}>
           I read another!

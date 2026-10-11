@@ -421,4 +421,60 @@ describe('v7: custom tasks + furniture', () => {
     expect(st.children.theodore.stars).toBe(2)
     expect(st.claims['f-1'].questTitle).toBe('Set the table')
   })
+
+  it('withdrawClaim: kid device can undo a pending claim; a withdrawn claim cannot be approved', async () => {
+    const store = new FakeStore()
+    const hid = await store.seed()
+    await store.setPin(hid, '1234')
+    const pr = await call(store, GROWN, 'createPairingCode', { householdId: hid })
+    await call(store, KID, 'pairDevice', { code: (pr.json as { code: string }).code })
+
+    // kid claims, then takes it back — no PIN needed
+    const claim = await call(store, KID, 'command', {
+      householdId: hid,
+      command: { type: 'claimQuest', childId: 'theodore', questId: 'spanish', claimId: 'w-1' },
+    })
+    expect((claim.json as { result: { ok: boolean } }).result.ok).toBe(true)
+    const withdraw = await call(store, KID, 'command', {
+      householdId: hid,
+      command: { type: 'withdrawClaim', claimId: 'w-1', childId: 'theodore' },
+    })
+    expect(withdraw.status).toBe(200)
+    expect((withdraw.json as { result: { ok: boolean } }).result.ok).toBe(true)
+    expect(store.households.get(hid)!.state.claims['w-1']).toBeUndefined()
+
+    // grown-up approving the withdrawn id fails domain-side
+    const approve = await call(store, GROWN, 'command', {
+      householdId: hid,
+      pin: '1234',
+      command: { type: 'approveClaim', claimId: 'w-1' },
+    })
+    expect((approve.json as { result: { ok: boolean } }).result.ok).toBe(false)
+
+    // the sibling cannot withdraw the kid's claim
+    const claim2 = await call(store, KID, 'command', {
+      householdId: hid,
+      command: { type: 'claimQuest', childId: 'theodore', questId: 'spanish', claimId: 'w-2' },
+    })
+    expect((claim2.json as { result: { ok: boolean } }).result.ok).toBe(true)
+    const wrongKid = await call(store, KID, 'command', {
+      householdId: hid,
+      command: { type: 'withdrawClaim', claimId: 'w-2', childId: 'leonard' },
+    })
+    expect((wrongKid.json as { result: { ok: boolean } }).result.ok).toBe(false)
+
+    // and the server rejects withdrawing an approved claim
+    const approve2 = await call(store, GROWN, 'command', {
+      householdId: hid,
+      pin: '1234',
+      command: { type: 'approveClaim', claimId: 'w-2' },
+    })
+    expect((approve2.json as { result: { ok: boolean } }).result.ok).toBe(true)
+    const tooLate = await call(store, KID, 'command', {
+      householdId: hid,
+      command: { type: 'withdrawClaim', claimId: 'w-2', childId: 'theodore' },
+    })
+    expect((tooLate.json as { result: { ok: boolean } }).result.ok).toBe(false)
+    expect(store.households.get(hid)!.state.claims['w-2'].status).toBe('approved')
+  })
 })
